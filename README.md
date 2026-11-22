@@ -3,7 +3,7 @@
 Продаж технічних і спеціальних тканин бізнесам (https://raznobyt.com/); мета: залучати нових клієнтів і нарощувати продажі через інтернет-маркетинг, насамперед Google. Окремий Claude Project: рознобит. Платформа AI-Company (правила, ролі, Skills, SOP) лежить у `_platform/` (лише читання); тут дані й результати цього бізнесу. Доступи й рівні даних: `ACCESS.md`.
 
 ## Склад команди
-Operations Director (керує завданнями), Product Researcher (ніша, клієнти, конкуренти), Sales Manager (продажі, кваліфікація, скрипти), Growth Manager (воронка, економіка, плани зростання), Creative Director (контент і тексти), Ads Manager (Google Ads, тести), Store Builder (оптимізація сайту, SEO на сторінці, конверсія). Supplier Manager підключається пізніше.
+Operations Director (керує завданнями), Product Researcher (ніша, клієнти, конкуренти), SEO Specialist (пошуковий попит, семантика, аудит сайту, SEO-ТЗ), Sales Manager (продажі, кваліфікація, скрипти), Growth Manager (воронка, економіка, плани зростання), Creative Director (контент і тексти), Ads Manager (Google Ads, тести), Store Builder (структура й вигляд сайту, конверсія), Web Developer (зміни коду сайту, локальні перевірки; деплой лише CEO). Supplier Manager підключається пізніше.
 
 ## Як це працює
 1. Ви ставите ціль Director у його сесії.

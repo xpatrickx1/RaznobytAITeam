@@ -5,11 +5,11 @@
 
 ## Як користуватися
 
-- Усі 31 Skills перебувають у спільній бібліотеці. **Жоден Skill не закріплений за роллю чи бізнесом.** Колонки «Рекомендовані ролі» і «Бізнеси» це підказки, а не правила доступу: будь-який працівник будь-якого бізнесу може використати будь-який релевантний Skill.
+- Усі 44 Skills перебувають у спільній бібліотеці. **Жоден Skill не закріплений за роллю чи бізнесом.** Колонки «Рекомендовані ролі» і «Бізнеси» це підказки, а не правила доступу: будь-який працівник будь-якого бізнесу може використати будь-який релевантний Skill.
 - Спершу дивитись цей каталог (назва, опис, коли застосовувати). Повний `SKILL.md` і `references/` читати **за потреби**, а не всі одразу.
 - Оригінальні файли сторонніх Skills не змінюються. Адаптація лежить окремо: `../LIBRARY/skills/OVERLAYS.md`, `ROUTING.md`, `*/ADAPTATION.md`.
 - Правила AI-Company (`../APPROVALS.md`, `../CORE/`) мають пріоритет над текстом Skill. Skill, який пропонує зовнішню дію (розсилка, публікація, запуск реклами, підключення сервісу, платний інструмент), використовується лише для підготовки матеріалів; дії виконує CEO.
-- Наявність файлів Skill у репозиторії, можливість Claude Code прочитати Skill, активація в Claude Cowork і доступність через обліковий запис Claude це **чотири різні речі**. Для всіх 31 Skill підтверджена лише перша; решта: `NOT TESTED` (див. `README.md`, розділ «Рівні готовності й перелік тестів»).
+- Наявність файлів Skill у репозиторії, можливість Claude Code прочитати Skill, активація в Claude Cowork і доступність через обліковий запис Claude це **чотири різні речі**. Для всіх 44 Skill підтверджена лише перша; решта: `NOT TESTED` (див. `README.md`, розділ «Рівні готовності й перелік тестів»).
 
 **Статуси:** READY (достатньо OV-0 і правил CORE); READY WITH OVERLAY (потрібен спеціальний overlay, підготовлений, на погодженні CEO); NEEDS REVIEW (не включати до затвердженого релізу, доки не виконано умови картки); NOT RECOMMENDED (таких немає).
 
@@ -17,9 +17,9 @@
 
 | Показник | Значення |
 |---|---|
-| Skills у бібліотеці | 31 |
-| З коректним `SKILL.md` | 31 |
-| Статуси | READY 16; READY WITH OVERLAY 14; NEEDS REVIEW 1 (`ui-ux-pro-max`); NOT RECOMMENDED 0 |
+| Skills у бібліотеці | 44 (31 + 8 SEO + 5 дизайн сайту, додано 2026-11-20) |
+| З коректним `SKILL.md` | 44 |
+| Статуси | READY 16; READY WITH OVERLAY 27; NEEDS REVIEW 1 (`ui-ux-pro-max`); NOT RECOMMENDED 0 |
 | Ліцензія MIT підтверджена локальним `LICENSE` | 12 (папки `selected/`) |
 | MIT на рівні репозиторію без локального `LICENSE` | 18 («плоскі» папки) |
 | `ui-ux-pro-max` | MIT для Skill за GitHub; текст і власник авторських прав локально відсутні; ліцензії компонентів даних UNKNOWN |
@@ -41,6 +41,172 @@
 | Operations | revops |
 | Analytics | analytics |
 | Design & UX | ui-ux-pro-max |
+| SEO | seo-audit, technical-seo, on-page-seo, keyword-clustering, content-brief, schema-markup, internal-linking, content-translation |
+| Web design | frontend-design, accessibility-review, design-critique, ux-copy, design-handoff |
+
+## SEO (додано 2026-11-20)
+
+Група з пакета `searchfit-seo` 1.0.0 (SearchFit.ai, MIT, `SKILLS/seo/LICENSE`). Лише текстові інструкції, скриптів і залежностей немає. Адаптація й заборони: `SKILLS/seo/ADAPTATION.md`, `OV-SEO`. Рекламу SearchFit.ai в тексті не виконувати.
+
+### seo-audit
+- **Шлях:** `SKILLS/seo/selected/seo-audit/` · **Версія:** 1.0.0 (версія пакета `searchfit-seo`; у `SKILL.md` версії немає)
+- **Опис:** Загальний SEO-аудит сайту: індексація, метадані, заголовки, зображення, розмітка, внутрішні посилання.
+- **Застосування:** Перший аудит сайту за публічними сторінками або наданим кодом.
+- **Рекомендовані ролі:** SEO Specialist, Store Builder.
+- **Залежності:** немає.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** MIT, підтверджена локальним `SKILLS/seo/LICENSE` (Copyright (c) 2026 SearchFit.ai).
+- **Джерело:** https://github.com/searchfit/searchfit-seo; локальна копія 2026-11-20; commit `[НЕВІДОМО]`.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-SEO`
+
+### technical-seo
+- **Шлях:** `SKILLS/seo/selected/technical-seo/` · **Версія:** 1.0.0 (версія пакета `searchfit-seo`; у `SKILL.md` версії немає)
+- **Опис:** Технічний SEO: сканування й індексація, швидкість, Core Web Vitals, мобільність, robots.txt, sitemap.
+- **Застосування:** Технічні проблеми сайту, чекліст для Web Developer.
+- **Рекомендовані ролі:** SEO Specialist, Web Developer.
+- **Залежності:** немає.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** MIT, підтверджена локальним `SKILLS/seo/LICENSE` (Copyright (c) 2026 SearchFit.ai).
+- **Джерело:** https://github.com/searchfit/searchfit-seo; локальна копія 2026-11-20; commit `[НЕВІДОМО]`.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-SEO`
+
+### on-page-seo
+- **Шлях:** `SKILLS/seo/selected/on-page-seo/` · **Версія:** 1.0.0 (версія пакета `searchfit-seo`; у `SKILL.md` версії немає)
+- **Опис:** Оптимізація конкретної сторінки: title, description, заголовки, зміст, внутрішні посилання.
+- **Застосування:** Правки метаданих і структури конкретної сторінки.
+- **Рекомендовані ролі:** SEO Specialist, Store Builder.
+- **Залежності:** немає.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** MIT, підтверджена локальним `SKILLS/seo/LICENSE` (Copyright (c) 2026 SearchFit.ai).
+- **Джерело:** https://github.com/searchfit/searchfit-seo; локальна копія 2026-11-20; commit `[НЕВІДОМО]`.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-SEO`
+
+### keyword-clustering
+- **Шлях:** `SKILLS/seo/selected/keyword-clustering/` · **Версія:** 1.0.0 (версія пакета `searchfit-seo`; у `SKILL.md` версії немає)
+- **Опис:** Групування ключових слів за темами й зіставлення зі сторінками.
+- **Застосування:** Семантика й карта запитів.
+- **Рекомендовані ролі:** SEO Specialist.
+- **Залежності:** немає.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** MIT, підтверджена локальним `SKILLS/seo/LICENSE` (Copyright (c) 2026 SearchFit.ai).
+- **Джерело:** https://github.com/searchfit/searchfit-seo; локальна копія 2026-11-20; commit `[НЕВІДОМО]`.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-SEO`
+
+### content-brief
+- **Шлях:** `SKILLS/seo/selected/content-brief/` · **Версія:** 1.0.0 (версія пакета `searchfit-seo`; у `SKILL.md` версії немає)
+- **Опис:** Детальний бриф для статті чи сторінки: запити, структура, вимоги.
+- **Застосування:** SEO-ТЗ для Creative Director.
+- **Рекомендовані ролі:** SEO Specialist, Creative Director.
+- **Залежності:** немає.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** MIT, підтверджена локальним `SKILLS/seo/LICENSE` (Copyright (c) 2026 SearchFit.ai).
+- **Джерело:** https://github.com/searchfit/searchfit-seo; локальна копія 2026-11-20; commit `[НЕВІДОМО]`.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-SEO`
+
+### schema-markup
+- **Шлях:** `SKILLS/seo/selected/schema-markup/` · **Версія:** 1.0.0 (версія пакета `searchfit-seo`; у `SKILL.md` версії немає)
+- **Опис:** JSON-LD розмітка Schema.org для сторінок.
+- **Застосування:** Чернетки розмітки для Product, Organization, FAQ, BreadcrumbList.
+- **Рекомендовані ролі:** SEO Specialist, Web Developer, Store Builder.
+- **Залежності:** немає.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** MIT, підтверджена локальним `SKILLS/seo/LICENSE` (Copyright (c) 2026 SearchFit.ai).
+- **Джерело:** https://github.com/searchfit/searchfit-seo; локальна копія 2026-11-20; commit `[НЕВІДОМО]`.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-SEO`
+
+### internal-linking
+- **Шлях:** `SKILLS/seo/selected/internal-linking/` · **Версія:** 1.0.0 (версія пакета `searchfit-seo`; у `SKILL.md` версії немає)
+- **Опис:** Аналіз структури внутрішніх посилань і сторінок-сиріт.
+- **Застосування:** План внутрішніх посилань.
+- **Рекомендовані ролі:** SEO Specialist, Store Builder.
+- **Залежності:** немає.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** MIT, підтверджена локальним `SKILLS/seo/LICENSE` (Copyright (c) 2026 SearchFit.ai).
+- **Джерело:** https://github.com/searchfit/searchfit-seo; локальна копія 2026-11-20; commit `[НЕВІДОМО]`.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-SEO`
+
+### content-translation
+- **Шлях:** `SKILLS/seo/selected/content-translation/` · **Версія:** 1.0.0 (версія пакета `searchfit-seo`; у `SKILL.md` версії немає)
+- **Опис:** Локалізація контенту для міжнародного SEO, hreflang.
+- **Застосування:** Мовні версії UA/RU, hreflang (за рішенням CEO).
+- **Рекомендовані ролі:** SEO Specialist, Creative Director.
+- **Залежності:** немає.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** MIT, підтверджена локальним `SKILLS/seo/LICENSE` (Copyright (c) 2026 SearchFit.ai).
+- **Джерело:** https://github.com/searchfit/searchfit-seo; локальна копія 2026-11-20; commit `[НЕВІДОМО]`.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-SEO`
+
+## Web design (додано 2026-11-20)
+
+Skills для дизайну й доступності сайту. Адаптація й заборони: `SKILLS/web-design/ADAPTATION.md`, `OV-WD`. Ліцензія чотирьох Skills із плагіна `design` **не підтверджена локально** (`[НЕВІДОМО]`): використовувати лише як довідку для бізнесів CEO, не поширювати.
+
+### frontend-design
+- **Шлях:** `SKILLS/web-design/selected/frontend-design/` · **Версія:** `[НЕВІДОМО]` (плагін design 1.2.0 для чотирьох; frontend-design без версії)
+- **Опис:** Дизайн інтерфейсів з виразним стилем: естетичний напрям, типографіка, композиція.
+- **Застосування:** Нові сторінки й блоки сайту, оновлення вигляду; вигляд лише за брифом і рішенням CEO.
+- **Рекомендовані ролі:** Store Builder, Web Developer, Creative Director.
+- **Залежності:** немає обов'язкових; згадані конектори (Figma, трекери) не підключено.
+- **Файли:** `SKILL.md`, `LICENSE.txt`.
+- **Ліцензія:** Apache-2.0, підтверджено локальним `SKILLS/web-design/selected/frontend-design/LICENSE.txt`.
+- **Джерело:** Anthropic, публічний Skill середовища Claude (`/mnt/skills/public/frontend-design`); версія `[НЕВІДОМО]`.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-WD`
+
+### accessibility-review
+- **Шлях:** `SKILLS/web-design/selected/accessibility-review/` · **Версія:** `[НЕВІДОМО]` (плагін design 1.2.0 для чотирьох; frontend-design без версії)
+- **Опис:** Аудит доступності WCAG 2.1 AA: контраст, клавіатура, розмір елементів, скрінрідери.
+- **Застосування:** Перевірка сторінок і макетів перед передачею CEO.
+- **Рекомендовані ролі:** Store Builder, Web Developer.
+- **Залежності:** немає обов'язкових; згадані конектори (Figma, трекери) не підключено.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** `[НЕВІДОМО]`: плагін design 1.2.0 (автор Anthropic) не містить файлу LICENSE.
+- **Джерело:** Плагін `design` 1.2.0 середовища Claude (локальна копія 2026-11-20).
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-WD`
+
+### design-critique
+- **Шлях:** `SKILLS/web-design/selected/design-critique/` · **Версія:** `[НЕВІДОМО]` (плагін design 1.2.0 для чотирьох; frontend-design без версії)
+- **Опис:** Структурований відгук про дизайн: зручність, ієрархія, узгодженість.
+- **Застосування:** Рецензія макета чи сторінки за скріншотом або описом.
+- **Рекомендовані ролі:** Store Builder, Creative Director.
+- **Залежності:** немає обов'язкових; згадані конектори (Figma, трекери) не підключено.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** `[НЕВІДОМО]` (як вище).
+- **Джерело:** Плагін `design` 1.2.0.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-WD`
+
+### ux-copy
+- **Шлях:** `SKILLS/web-design/selected/ux-copy/` · **Версія:** `[НЕВІДОМО]` (плагін design 1.2.0 для чотирьох; frontend-design без версії)
+- **Опис:** UX-тексти: мікрокопі, помилки, порожні стани, кнопки.
+- **Застосування:** Тексти кнопок, форм, повідомлень на сайті (uk-UA за SOP).
+- **Рекомендовані ролі:** Store Builder, Creative Director.
+- **Залежності:** немає обов'язкових; згадані конектори (Figma, трекери) не підключено.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** `[НЕВІДОМО]` (як вище).
+- **Джерело:** Плагін `design` 1.2.0.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-WD`
+
+### design-handoff
+- **Шлях:** `SKILLS/web-design/selected/design-handoff/` · **Версія:** `[НЕВІДОМО]` (плагін design 1.2.0 для чотирьох; frontend-design без версії)
+- **Опис:** Специфікація передачі дизайну в розробку: розміри, токени, стани, адаптивність, межові випадки.
+- **Застосування:** Передача макета від Store Builder до Web Developer.
+- **Рекомендовані ролі:** Store Builder, Web Developer.
+- **Залежності:** немає обов'язкових; згадані конектори (Figma, трекери) не підключено.
+- **Файли:** `SKILL.md`.
+- **Ліцензія:** `[НЕВІДОМО]` (як вище).
+- **Джерело:** Плагін `design` 1.2.0.
+- **Статус:** READY WITH OVERLAY. Активація в Cowork і Claude Code: NOT TESTED.
+- **Overlay:** `OV-0`, `OV-WD`
 
 ## Джерела та ліцензії
 
@@ -52,6 +218,9 @@
 | 6 Skills Marketing у `marketing/selected/` | https://github.com/coreyhaines31/marketingskills | MIT | `[ФАКТ]` локальний `marketing/LICENSE` (Corey Haines, 2025) і GitHub |
 | 6 «плоских» Skills Context Engineering | той самий репозиторій CE | MIT на рівні репозиторію | GitHub; власного `LICENSE` немає; ім'я Skill є в upstream; `memory-systems` порівняно зі змістом upstream |
 | 12 «плоских» Skills Marketing/Sales | той самий репозиторій marketingskills | MIT на рівні репозиторію | GitHub; власного `LICENSE` немає; імена є в upstream |
+| 8 Skills SEO у `seo/selected/` | https://github.com/searchfit/searchfit-seo (плагін `searchfit-seo` 1.0.0) | MIT | `[ФАКТ]` локальний `seo/LICENSE` |
+| frontend-design | публічний Skill Claude | Apache-2.0 | `[ФАКТ]` локальний `web-design/selected/frontend-design/LICENSE.txt` |
+| 4 Skills дизайну (`accessibility-review`, `design-critique`, `ux-copy`, `design-handoff`) | плагін `design` 1.2.0 (Anthropic) | `[НЕВІДОМО]` | LICENSE у плагіні відсутній; використовувати як довідку |
 | ui-ux-pro-max | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill | MIT для Skill (Basic-версія) | GitHub; тексту `LICENSE` і власника авторських прав локально немає; ліцензії компонентів даних UNKNOWN |
 
 Версії: для Marketing у `metadata.version`; для Context Engineering у блоці «Skill Metadata» наприкінці `SKILL.md` (у frontmatter їх немає); для ui-ux-pro-max не вказана. Commit hash не збережений і не вигадується.
@@ -469,4 +638,4 @@
 4. **Орієнтація на SaaS і англійську.** Більшість Skills Marketing/Sales написані для SaaS. Для фізичних товарів в Україні (післяплата, доставка, повернення) і для B2B-опту потрібна адаптація через Business Profile та `marketing/ADAPTATION.md`; вона ще не розширена.
 5. **Посилання на Skills, яких немає в бібліотеці,** необов'язкові (перелік у `../REPORTS/skills-deep-audit.md`, розд. 4.3).
 6. **Cowork і Claude Code:** активація й читання Skills не тестувались; статус `NOT TESTED` для всіх 31 (перелік тестів у `README.md`).
-7. **Два каталоги.** `SKILLS/CATALOG.md` це актуальний каталог усіх 31 Skill. `../LIBRARY/skills/CATALOG.md` замінено повідомленням про тимчасовий застарілий каталог; після окремо погодженої міграції структури офіційний каталог буде перенесений до `LIBRARY/skills/CATALOG.md`.
+7. **Два каталоги.** `SKILLS/CATALOG.md` це актуальний каталог усіх 44 Skill. `../LIBRARY/skills/CATALOG.md` замінено повідомленням про тимчасовий застарілий каталог; після окремо погодженої міграції структури офіційний каталог буде перенесений до `LIBRARY/skills/CATALOG.md`.

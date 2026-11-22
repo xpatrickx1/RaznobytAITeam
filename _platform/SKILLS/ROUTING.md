@@ -2,7 +2,7 @@
 
 Підказки для ролей: у яких випадках відкривати який Skill або SOP. Джерело для `ROLES/*.md` і Role Templates (`../LIBRARY/roles/`); у role-файл потрапляє лише відповідний рядок, не текст Skill/SOP.
 
-**Це рекомендації, а не білий список.** Усі 31 Skills спільні; будь-який працівник може відкрити будь-який релевантний Skill за `CATALOG.md`, навіть якщо його немає в рядку своєї ролі. Skills комбінуються. Бізнес-рекомендації (наприклад, outreach-Skills для B2B/Raznobyt) теж лише підказки. **Повний `SKILL.md` і `references/` читаються за потреби**, не весь каталог одразу.
+**Це рекомендації, а не білий список.** Усі 44 Skills спільні; будь-який працівник може відкрити будь-який релевантний Skill за `CATALOG.md`, навіть якщо його немає в рядку своєї ролі. Skills комбінуються. Бізнес-рекомендації (наприклад, outreach-Skills для B2B/Raznobyt) теж лише підказки. **Повний `SKILL.md` і `references/` читаються за потреби**, не весь каталог одразу.
 
 **Загальне правило:** на початку сесії читати `STATUS.md`, своє завдання, свій role-файл. Skill відкривати (`SKILL.md`, `references/` лише за потреби) тільки за тригером. Мітки фактів і джерела за `STANDARDS.md`. Обмеження за `APPROVALS.md`. **Активність Skill у Cowork не підтверджена тестом; у цьому файлі Skills названо джерелами знань, а не активованими функціями.**
 
@@ -11,9 +11,9 @@
 1. **Усі дії в рекламних кабінетах виконує виключно CEO.** Жоден агент не запускає, не зупиняє, не редагує кампанії, оголошення, аудиторії, бюджети; не завантажує рекламні матеріали на платформи; не використовує для цього CLI, API, MCP, токени. Створення готових рекламних матеріалів і текстів як **локальних файлів** дозволено (Creative Director).
 2. `DATA/` для всіх AI-агентів, включно з Director, лише для читання: дані й реєстри записує лише CEO. Роль пише результати тільки у власний `WORKSPACE/<роль>/`; Director перевіряє їх і готує пропозиції оновлення реєстрів у `REPORTS/`, CEO затверджує й переносить дані в `DATA/`.
 3. Операційні процедури лежать у `SOPS/`; при конфлікті SOP і Skill діє SOP.
-4. Skill `ads` не додано. Відсутні необов'язкові залежності Skills (`ads/references/meta-decision-system.md`, `seo-audit`, `marketing-ideas`, `emails`, `ab-testing` та ін.) **не копіюються**: ці посилання ігнорувати. `copy-editing` у бібліотеці є.
+4. Skill `ads` не додано. Відсутні необов'язкові залежності Skills (`ads/references/meta-decision-system.md`, `marketing-ideas`, `emails`, `ab-testing` та ін.) **не копіюються**: ці посилання ігнорувати. `copy-editing` у бібліотеці є.
 5. Український текст перевіряється за `SOPS/ukrainian-copywriting-style.md`, англомовні переліки «AI-тел» не застосовуються.
-6. Спеціальні обмеження Skills задають оверлеї (`../LIBRARY/skills/OVERLAYS.md`): OV-OUT (prospecting, cold-email, sales-enablement, revops), OV-PUB (social), OV-VID (video), OV-MP (marketing-plan), OV-AC (ad-creative), OV-CW (copywriting, copy-editing) та інші. Персональні дані: `../CORE/CONFIDENTIALITY.md`.
+6. Спеціальні обмеження Skills задають оверлеї (`../LIBRARY/skills/OVERLAYS.md`): OV-OUT (prospecting, cold-email, sales-enablement, revops), OV-PUB (social), OV-VID (video), OV-MP (marketing-plan), OV-SEO (SEO-skills), OV-WD (дизайн сайту), OV-AC (ad-creative), OV-CW (copywriting, copy-editing) та інші. Персональні дані: `../CORE/CONFIDENTIALITY.md`.
 
 ## Маршрутизація
 
@@ -54,6 +54,13 @@
 | Growth Manager, Director | marketing-plan (OV-MP) | Маркетинговий план на період | Profile, `{DATA}` (лише читання) | `{WORKSPACE}/marketing-plans/<slug>/final_plan.md`; без зовнішніх публікацій і платних інтеграцій |
 | Sales Manager, Growth Manager | revops (OV-OUT) | Стадії воронки, скоринг, передавання, вибір CRM | Profile, поточні процеси | Опис процесу; налаштування в сервісах виконує CEO |
 | Store Builder, Creative Director | ui-ux-pro-max | **NEEDS REVIEW:** до зняття статусу лише як довідка, скрипти не запускати (`ui-ux-pro-max/INSTALL.md`) | Потрібні файли `data/` | Рекомендації; у реліз не включено |
+| SEO Specialist, Store Builder | seo-audit, technical-seo, on-page-seo (OV-SEO) | Аудит сайту, сторінки, метадані | Публічні сторінки сайту, експорти Search Console від CEO | Аудит із URL-доказами й пріоритетами; зміни на сайті лише CEO |
+| SEO Specialist | keyword-clustering, content-brief (OV-SEO) | Семантика, ТЗ на текст | Профіль, експорти запитів від CEO | Карта запитів, SEO-ТЗ для Creative Director |
+| SEO Specialist, Web Developer, Store Builder | schema-markup, internal-linking (OV-SEO) | Розмітка, внутрішні посилання | Сторінки сайту | Чернетки JSON-LD, план посилань |
+| SEO Specialist, Creative Director | content-translation (OV-SEO) | Мовні версії UA/RU, hreflang | Рішення CEO щодо мов | Рекомендації; переклад лише за завданням |
+| Store Builder, Web Developer, Creative Director | frontend-design (OV-WD) | Новий блок чи сторінка, оновлення вигляду | Бриф із Profile, скріншоти від CEO | Дизайн-рішення як локальні файли; редизайн лише за рішенням CEO |
+| Store Builder, Web Developer | accessibility-review, design-handoff (OV-WD) | Перевірка доступності; передача макета в розробку | Макет або сторінка | Звіт доступності; специфікація для Web Developer |
+| Store Builder, Creative Director | design-critique, ux-copy (OV-WD) | Рецензія макета; тексти інтерфейсу | Скріншот чи текст від CEO | Зауваження й тексти uk-UA за SOP |
 
 ## Override для ad-creative (дослівно в role-файли Creative Director і Ads Manager)
 
@@ -65,6 +72,6 @@
 |---|---|
 | `.agents/product-marketing.md`, `.claude/product-marketing.md` | `WORKSPACE/product-researcher/products/<slug>/context.md` (slug з `DATA/products-index.md`) |
 | «tools registry», `tools/clis/*` | Нічого не підключати |
-| `ads/references/meta-decision-system.md`, `seo-audit/...`, `marketing-ideas`, `emails` тощо | Не потрібні; див. правило 4 |
+| `ads/references/meta-decision-system.md`, `marketing-ideas`, `emails` тощо | Не потрібні; див. правило 4 |
 | `~/marketing-plans/{client-slug}/` (marketing-plan) | `{WORKSPACE}/marketing-plans/<slug>/` бізнесу (OV-MP) |
 | `${CLAUDE_PLUGIN_ROOT}/.claude/skills/ui-ux-pro-max/...` | Не перевірено для нашого середовища (NEEDS REVIEW) |

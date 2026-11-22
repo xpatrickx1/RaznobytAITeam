@@ -1,7 +1,7 @@
 ---
 role: creative-director
 бізнес: raznobyt
-platform_release: 1.0
+platform_release: 1.2
 core_версія: 1.1
 шаблон_версія: 2.0
 reports_to: operations-director

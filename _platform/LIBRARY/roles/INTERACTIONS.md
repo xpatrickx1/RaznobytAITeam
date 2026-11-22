@@ -1,6 +1,6 @@
 # Взаємодія ролей: правила й матриця передачі
 
-Версія 1.0 (2026-11-16). Частина бібліотеки ролей; підпорядкована `CORE`, `APPROVALS.md` і шаблонам ролей. Ролі посилаються сюди й не повторюють матрицю.
+Версія 1.2 (2026-11-20: додано Web Developer; 1.1, 2026-11-16: SEO Specialist). Частина бібліотеки ролей; підпорядкована `CORE`, `APPROVALS.md` і шаблонам ролей. Ролі посилаються сюди й не повторюють матрицю.
 
 ## 1. Принципи
 1. Взаємодія лише через **файли**: завдання у `{TASKS}`, результати у `{WORKSPACE}/<роль>/`, звіти у `{REPORTS}`. Прямого листування між спеціалістами немає.
@@ -35,6 +35,16 @@
 | Creative Director → Store Builder | Тексти, повідомлення, візуальний напрям, специфікації | Director | Creative Director | Director | Store Builder (вбудування в структуру сторінок) | CEO: публікація |
 | Store Builder → Creative Director | Вимоги до формату сторінок і блоків, потреба в матеріалах | Director | Store Builder | Director | Creative Director | CEO |
 | Store Builder → Growth Manager / Sales Manager | Структура воронки на сайті, сторінки, CRO-гіпотези | Director | Store Builder | Director | Growth Manager, Sales Manager | CEO |
+| Product Researcher → SEO Specialist | Сегменти, конкуренти, мова клієнтів, ніші | Director | Product Researcher | Director | SEO Specialist (запити й семантика) | CEO |
+| SEO Specialist → Creative Director | SEO-ТЗ для текстів: запити, структура, вимоги | Director | SEO Specialist | Director | Creative Director (написання текстів) | CEO: публікація |
+| SEO Specialist → Store Builder | SEO-ТЗ для сторінок і технічних правок: структура, метадані, розмітка, посилання | Director | SEO Specialist | Director | Store Builder (чернетки змін) | CEO: зміни на сайті |
+| SEO Specialist → Growth Manager | SEO-звіти, органічні результати, гіпотези | Director | SEO Specialist | Director | Growth Manager | CEO |
+| Ads Manager → SEO Specialist | Пошукові запити й терміни з реклами, що конвертуються | Director | Ads Manager | Director | SEO Specialist | CEO |
+| Store Builder → SEO Specialist | Запит на SEO-перевірку змін перед публікацією | Director | Store Builder | Director | SEO Specialist | CEO |
+| Store Builder → Web Developer | Специфікація реалізації (design-handoff): макети, тексти, розміри, стани | Director | Store Builder | Director | Web Developer (зміни коду) | CEO: розгортання |
+| SEO Specialist → Web Developer | Технічні SEO-вимоги: метадані, розмітка, canonical, швидкість | Director | SEO Specialist | Director | Web Developer | CEO: розгортання |
+| Growth Manager → Web Developer | Затверджені CEO гіпотези зі зміною сайту | Director за рішенням CEO | Growth Manager | Director | Web Developer | CEO |
+| Web Developer → Store Builder / SEO Specialist | Реалізовані зміни для перевірки на відповідність специфікації | Director | Web Developer | Director | Store Builder, SEO Specialist | CEO: розгортання |
 | Усі спеціалісти → Operations Director | Результат у `{WORKSPACE}/<роль>/`; статус виконано / частково / заблоковано; питання; потреба в рішенні CEO | Director (завдання) | Спеціаліст | Director | Director → CEO (звіт) | CEO |
 
 ## 4. Розмежування, що усуває дублювання
@@ -43,6 +53,8 @@
 - **Постачальники:** Product Researcher дає попередній публічний сигнал; формальна перевірка, скор-картка й порівняння належать Supplier Manager.
 - **Тексти:** рекламні й повідомлення бренду пише Creative Director; тексти й структура сторінок магазину, каталогу та карток готує Store Builder на основі підтверджених фактів і матеріалів Creative Director; скрипти й шаблони відповідей клієнтам готує Sales Manager.
 - **Воронка:** структуру продажів (стадії, скрипти, заперечення) веде Sales Manager; структуру воронки на сайті (UX, CRO) веде Store Builder; зведену картину росту й пріоритети експериментів веде Growth Manager.
+- **Сайт:** Store Builder і SEO Specialist визначають, що змінити (структура, вигляд, SEO-вимоги); Web Developer реалізує в коді й перевіряє локально; розгортає лише CEO.
+- **SEO:** SEO Specialist вирішує, що й чому оптимізувати (запити, наміри, структура, технічний аудит) і готує ТЗ; Creative Director пише тексти за ТЗ; Store Builder готує чернетки змін сторінок і конверсію; Growth Manager оцінює вплив на зростання. Пошукова реклама: ключові слова узгоджуються через Director між Ads Manager і SEO Specialist.
 - **Плани зростання:** власник каталогу `{MARKETING_PLANS}/` і процесу `marketing-plan` (OV-MP) це Growth Manager; інші ролі дають входи через Director.
 
 ## 5. Що спеціаліст робить, коли бракує входу від іншої ролі

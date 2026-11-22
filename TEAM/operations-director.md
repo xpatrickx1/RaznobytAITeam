@@ -1,7 +1,7 @@
 ---
 role: operations-director
 бізнес: raznobyt
-platform_release: 1.0
+platform_release: 1.2
 core_версія: 1.1
 шаблон_версія: 2.0
 reports_to: CEO
@@ -24,7 +24,7 @@ Binding не дублює Business Profile: лише проєктні парам
 KPI не задаються до рішення CEO після перших результатів; `[НЕВІДОМО]`.
 
 ## Пороги й параметри рішень
-- Команда проєкту (7 ролей): operations-director, product-researcher, sales-manager, growth-manager, creative-director, ads-manager, store-builder. Supplier Manager не підключено (`SETUP.md`); завдання для нього не створювати.
+- Команда проєкту (9 ролей): operations-director, product-researcher, seo-specialist, sales-manager, growth-manager, creative-director, ads-manager, store-builder, web-developer. Supplier Manager не підключено (`SETUP.md`); завдання для нього не створювати.
 - Делегувати лише ролям із binding цієї теки. Результат однієї ролі передавати іншій лише новим завданням за матрицею `_platform/LIBRARY/roles/INTERACTIONS.md`.
 - Завдання на плани зростання (`{MARKETING_PLANS}`) лише Growth Manager.
 

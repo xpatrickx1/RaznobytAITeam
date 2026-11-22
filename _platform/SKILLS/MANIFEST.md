@@ -1,18 +1,18 @@
 # MANIFEST — Skills бібліотеки: фактичний стан
 
-Оновлено: 2026-11-15. Підстава: сканування `SKILLS/` (31 Skill), `../REPORTS/skills-deep-audit.md`, рішення CEO щодо усунення проблем; попередні відомості 2026-11-13 (`../REPORTS/SKILLS_AUDIT_RESULT.md`, `../REPORTS/SKILLS_ADAPTATION_PLAN.md`, `../APPROVALS.md` розд. 6). Детальні картки: `CATALOG.md`. Джерела й ліцензії: `SOURCES.md`.
+Оновлено: 2026-11-20 (додано 8 SEO і 5 Skills дизайну сайту); попередня ревізія 2026-11-15. Підстава: сканування `SKILLS/` (31 Skill), `../REPORTS/skills-deep-audit.md`, рішення CEO щодо усунення проблем; попередні відомості 2026-11-13 (`../REPORTS/SKILLS_AUDIT_RESULT.md`, `../REPORTS/SKILLS_ADAPTATION_PLAN.md`, `../APPROVALS.md` розд. 6). Детальні картки: `CATALOG.md`. Джерела й ліцензії: `SOURCES.md`.
 
 ## Підсумок стану
 
 | Показник | Стан |
 |---|---|
-| Skills у репозиторії | 31 `[ФАКТ]`: 12 у `context-engineering/selected/` і `marketing/selected/`, 18 «плоских» папок у `SKILLS/`, `ui-ux-pro-max/` |
-| Статуси | READY 16; READY WITH OVERLAY 14; NEEDS REVIEW 1 (`ui-ux-pro-max`); NOT RECOMMENDED 0 |
+| Skills у репозиторії | 44 `[ФАКТ]` (31 + 8 SEO + 5 дизайн, 2026-11-20); початкові 31: 12 у `context-engineering/selected/` і `marketing/selected/`, 18 «плоских» папок у `SKILLS/`, `ui-ux-pro-max/` |
+| Статуси | READY 16; READY WITH OVERLAY 27; NEEDS REVIEW 1 (`ui-ux-pro-max`); NOT RECOMMENDED 0 |
 | Модель доступу | Усі Skills спільні. Жоден не закріплений за роллю чи бізнесом; рекомендації ролей це підказки. Повний текст читається за потреби |
 | Метод і момент копіювання | Копіювання виконано поза сесіями аудиту; спосіб і джерельний commit **не зафіксовані** `[НЕВІДОМО]` |
 | Оригінали Skills | Не змінюються. Контрольні суми файлів Skills (без наших документів) зафіксовано до робіт 2026-11-15 і звірено після |
 | Активність у Claude Desktop/Cowork | **Не підтверджено** практичним тестом. Жоден Skill не вважається активним; використовуються як довідка за `ROUTING.md` |
-| Адаптація | Шар поверх оригіналів: `../LIBRARY/skills/OVERLAYS.md` (OV-0, OV-PM, OV-AC, OV-AN, OV-CP, OV-CW, OV-LH, OV-OUT, OV-PUB, OV-VID, OV-MP; нові на погодженні CEO), `ROUTING.md`, `marketing/ADAPTATION.md`, `context-engineering/ADAPTATION.md`, `../SOPS/` |
+| Адаптація | Шар поверх оригіналів: `../LIBRARY/skills/OVERLAYS.md` (OV-0, OV-PM, OV-AC, OV-AN, OV-CP, OV-CW, OV-LH, OV-OUT, OV-PUB, OV-VID, OV-MP, OV-SEO, OV-WD; нові на погодженні CEO), `ROUTING.md`, `marketing/ADAPTATION.md`, `context-engineering/ADAPTATION.md`, `../SOPS/` |
 | Skill `ads` | Не додається (рішення CEO). Замість нього власні SOPS |
 | Відсутні залежності | Не копіюються; посилання на них необов'язкові й ігноруються (`../REPORTS/skills-deep-audit.md`, розд. 4.3) |
 | Історичні commit hashes | Не збережені. Див. `SOURCES.md` |
@@ -54,6 +54,19 @@
 | 29 | sales-enablement | MK | 2.4.3 | SKILL.md, 6 ref, evals | READY WITH OVERLAY | OV-OUT | Матеріали для продажів, заперечення | Sales Manager, Creative Director | Основна рекомендація B2B (Raznobyt) |
 | 30 | revops | MK | 2.2.4 | SKILL.md, 5 ref, evals | READY WITH OVERLAY | OV-OUT | Процеси воронки, скоринг, CRM-дизайн | Sales Manager, Growth Manager | Основна рекомендація B2B (Raznobyt); дизайн без налаштування |
 | 31 | ui-ux-pro-max | UX | не вказана | SKILL.md, 2 ref, 5 script, 28 test, 39 data | NEEDS REVIEW | — | Дизайн-інтелект для UI (дані, пошук) | Store Builder, Creative Director | Не включати до затвердженого релізу до виконання умов (див. `CATALOG.md`) |
+| 32 | seo-audit | SEO | 1.0.0 | SKILL.md | READY WITH OVERLAY | OV-SEO | Загальний SEO-аудит сайту: індексація, метадані, заголовки, зображення, розмітка, внутрішні посилання. | SEO Specialist, Store Builder | Довідка; рекомендації й чернетки, без змін на сайті |
+| 33 | technical-seo | SEO | 1.0.0 | SKILL.md | READY WITH OVERLAY | OV-SEO | Технічний SEO: сканування й індексація, швидкість, Core Web Vitals, мобільність, robots.txt, sitemap. | SEO Specialist, Web Developer | Довідка; рекомендації й чернетки, без змін на сайті |
+| 34 | on-page-seo | SEO | 1.0.0 | SKILL.md | READY WITH OVERLAY | OV-SEO | Оптимізація конкретної сторінки: title, description, заголовки, зміст, внутрішні посилання. | SEO Specialist, Store Builder | Довідка; рекомендації й чернетки, без змін на сайті |
+| 35 | keyword-clustering | SEO | 1.0.0 | SKILL.md | READY WITH OVERLAY | OV-SEO | Групування ключових слів за темами й зіставлення зі сторінками. | SEO Specialist | Довідка; рекомендації й чернетки, без змін на сайті |
+| 36 | content-brief | SEO | 1.0.0 | SKILL.md | READY WITH OVERLAY | OV-SEO | Детальний бриф для статті чи сторінки: запити, структура, вимоги. | SEO Specialist, Creative Director | Довідка; рекомендації й чернетки, без змін на сайті |
+| 37 | schema-markup | SEO | 1.0.0 | SKILL.md | READY WITH OVERLAY | OV-SEO | JSON-LD розмітка Schema.org для сторінок. | SEO Specialist, Web Developer, Store Builder | Довідка; рекомендації й чернетки, без змін на сайті |
+| 38 | internal-linking | SEO | 1.0.0 | SKILL.md | READY WITH OVERLAY | OV-SEO | Аналіз структури внутрішніх посилань і сторінок-сиріт. | SEO Specialist, Store Builder | Довідка; рекомендації й чернетки, без змін на сайті |
+| 39 | content-translation | SEO | 1.0.0 | SKILL.md | READY WITH OVERLAY | OV-SEO | Локалізація контенту для міжнародного SEO, hreflang. | SEO Specialist, Creative Director | Довідка; рекомендації й чернетки, без змін на сайті |
+| 40 | frontend-design | WD | — | SKILL.md, LICENSE.txt | READY WITH OVERLAY | OV-WD | Дизайн інтерфейсів з виразним стилем: естетичний напрям, типографіка, композиція. | Store Builder, Web Developer, Creative Director | Довідка; ліцензія Apache-2.0 |
+| 41 | accessibility-review | WD | 1.2.0 (плагін) | SKILL.md | READY WITH OVERLAY | OV-WD | Аудит доступності WCAG 2.1 AA: контраст, клавіатура, розмір елементів, скрінрідери. | Store Builder, Web Developer | Довідка; ліцензія UNKNOWN |
+| 42 | design-critique | WD | 1.2.0 (плагін) | SKILL.md | READY WITH OVERLAY | OV-WD | Структурований відгук про дизайн: зручність, ієрархія, узгодженість. | Store Builder, Creative Director | Довідка; ліцензія UNKNOWN |
+| 43 | ux-copy | WD | 1.2.0 (плагін) | SKILL.md | READY WITH OVERLAY | OV-WD | UX-тексти: мікрокопі, помилки, порожні стани, кнопки. | Store Builder, Creative Director | Довідка; ліцензія UNKNOWN |
+| 44 | design-handoff | WD | 1.2.0 (плагін) | SKILL.md | READY WITH OVERLAY | OV-WD | Специфікація передачі дизайну в розробку: розміри, токени, стани, адаптивність, межові випадки. | Store Builder, Web Developer | Довідка; ліцензія UNKNOWN |
 
 CE = Context Engineering, MK = Marketing Skills, UX = Design & UX. Версії: MK у `metadata.version`; CE у блоці «Skill Metadata» наприкінці `SKILL.md` (у frontmatter їх немає). Ліцензії та джерела: `SOURCES.md`.
 

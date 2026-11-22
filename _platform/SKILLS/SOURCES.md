@@ -94,3 +94,11 @@ git ls-remote https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git HEAD
 ## 8. Вторинні джерела (довідково)
 
 Описи на ossinsight.io, wikidocs.net, anavem.com, sourcepulse.org, zby.github.io використано лише для ліцензій/версій/способів встановлення з позначкою `[ПРИПУЩЕННЯ]`; першоджерелом вважаються LICENSE і SKILL.md у проєкті та сторінки репозиторіїв (розділ 7).
+
+## 9. Додані 2026-11-20 (SEO й дизайн сайту)
+
+- **SEO (8):** плагін `searchfit-seo` 1.0.0, https://github.com/searchfit/searchfit-seo, MIT (локальний `SKILLS/seo/LICENSE`), копія з локальної установки плагіна 2026-11-20; commit `[НЕВІДОМО]`. 4 Skills пакета не додано: `content-strategy` (дублює наявний), `ai-visibility`, `broken-links` (потребують живих запитів чи обходу сайту) та агенти/команди плагіна.
+- **frontend-design:** публічний Skill середовища Claude, Apache-2.0 (`SKILLS/web-design/selected/frontend-design/LICENSE.txt`); версія й commit `[НЕВІДОМО]`.
+- **accessibility-review, design-critique, ux-copy, design-handoff:** плагін `design` 1.2.0 (автор Anthropic), копія 2026-11-20; файлу LICENSE у плагіні немає: ліцензія `[НЕВІДОМО]`.
+- Пакет-першоджерело імпорту збережено: `../REPORTS/skills-import_2026-11-20.tgz`. Контрольні суми (перші 12 символів SHA-256) файлів зафіксовано в `seo/ADAPTATION.md` і `web-design/ADAPTATION.md`.
+- Не додано: `design-system`, `user-research`, `research-synthesis` (поза потребою), `ai-visibility`, `broken-links`, `content-strategy` (дублікат).

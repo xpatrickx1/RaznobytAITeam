@@ -1,0 +1,771 @@
+diff --git a/scripts/generate.js b/scripts/generate.js
+index 82d4b8b..1ffc301 100644
+--- a/scripts/generate.js
++++ b/scripts/generate.js
+@@ -3,7 +3,9 @@ import path from 'path';
+ import { fileURLToPath, pathToFileURL } from 'url';
+ import { dirname } from 'path';
+ import { build } from 'vite';
++import crypto from 'crypto';
+ import { injectCriticalCss } from './inject-critical-css.mjs';
++import { CATEGORY_PAGE_SIZE, getTotalPages } from '../src/lib/pagination.js';
+ 
+ const DOMAIN = 'https://raznobyt.com';
+ 
+@@ -66,6 +68,22 @@ async function generate() {
+         pages.push({ url: `/catalog/${cat.slug}/`, component: 'CategoryPage', props: { slug: cat.slug } });
+     }
+ 
++    // Сторінки пагінації категорій ?page=N (N ≥ 2): окремі файли page-N.html,
++    // nginx віддає їх за запитом /catalog/<slug>/?page=N (див. конфіг для CEO). У sitemap не потрапляють.
++    for (const cat of categories) {
++        const count = products.filter(p => p.category === cat.id).length;
++        const totalPages = getTotalPages(count, CATEGORY_PAGE_SIZE);
++        for (let n = 2; n <= totalPages; n++) {
++            pages.push({
++                url: `/catalog/${cat.slug}/?page=${n}`,
++                component: 'CategoryPage',
++                props: { slug: cat.slug },
++                outFile: `/catalog/${cat.slug}/page-${n}.html`,
++                paginated: true,
++            });
++        }
++    }
++
+     for (const prod of products) {
+         const cat = categories.find(c => c.id === prod.category);
+         const catSlug = cat ? cat.slug : 'unknown';
+@@ -75,18 +93,35 @@ async function generate() {
+     // RU-версія кожної сторінки під /ru/... (404 лишається одна — UA)
+     const ruPages = pages
+         .filter(p => p.url !== '/404/')
+-        .map(p => ({ ...p, url: p.url === '/' ? '/ru/' : `/ru${p.url}`, lang: 'ru', baseUrl: p.url }));
++        .map(p => ({
++            ...p,
++            url: p.url === '/' ? '/ru/' : `/ru${p.url}`,
++            outFile: p.outFile ? `/ru${p.outFile}` : undefined,
++            lang: 'ru',
++            baseUrl: p.url,
++        }));
+     pages.forEach(p => { p.lang = 'ua'; p.baseUrl = p.url; });
+     pages.push(...ruPages);
+ 
+     console.log(`Pre-rendering ${pages.length} pages...`);
+ 
++    // Хеш змісту сторінки для <lastmod>: без хешів файлів збірки й ?v=<версія>, які змінюються щозбірки
++    const contentHashes = new Map();
++    const normalizeForHash = (str) => String(str || '')
++        .replace(/([?&])v=\d+/g, '$1')
++        .replace(/-[A-Za-z0-9_-]{8}(\.(?:js|css|webp|png|jpe?g|svg|gif|avif|woff2?|pdf|p7s|docx?|xml))/g, '$1');
++
+     for (const page of pages) {
+         const { url, component, props = {} } = page;
+ 
+         try {
+             const { appHtml, helmet } = await render(url, component, props);
+ 
++            contentHashes.set(url, crypto.createHash('sha1')
++                .update(normalizeForHash(appHtml))
++                .update(normalizeForHash(helmet ? `${helmet.title}${helmet.meta}${helmet.link}` : ''))
++                .digest('hex'));
++
+             let html = template.replace('<!--app-html-->', appHtml);
+ 
+             if (helmet) {
+@@ -108,16 +143,19 @@ async function generate() {
+                 );
+             }
+ 
+-            let targetDir = path.join(root, 'dist');
+-            if (url !== '/') {
+-                targetDir = path.join(root, 'dist', url.endsWith('/') ? url.slice(0, -1) : url);
+-            }
+-
+-            if (!fs.existsSync(targetDir)) {
+-                fs.mkdirSync(targetDir, { recursive: true });
++            let targetFile;
++            if (page.outFile) {
++                targetFile = path.join(root, 'dist', page.outFile);
++            } else {
++                let targetDir = path.join(root, 'dist');
++                if (url !== '/') {
++                    targetDir = path.join(root, 'dist', url.endsWith('/') ? url.slice(0, -1) : url);
++                }
++                targetFile = path.join(targetDir, 'index.html');
+             }
+ 
+-            fs.writeFileSync(path.join(targetDir, 'index.html'), html);
++            fs.mkdirSync(path.dirname(targetFile), { recursive: true });
++            fs.writeFileSync(targetFile, html);
+             console.log(`✓ Rendered ${url}`);
+         } catch (e) {
+             console.error(`X Error rendering ${url}:`, e.message);
+@@ -150,10 +188,26 @@ async function generate() {
+     console.log('Injecting critical CSS into all pages...');
+     await injectCriticalCss();
+ 
++    // <lastmod>: дата зберігається, доки зміст сторінки не змінився.
++    // Попередній маніфест береться з живого сайту (/lastmod.json); якщо його немає — дата поточної збірки.
++    const today = new Date().toISOString().slice(0, 10);
++    const prevLastmod = await loadPrevLastmod();
++    const lastmodManifest = {};
++    for (const [url, hash] of contentHashes) {
++        const prev = prevLastmod[url];
++        lastmodManifest[url] = {
++            hash,
++            lastmod: prev && prev.hash === hash && /^\d{4}-\d{2}-\d{2}$/.test(prev.lastmod) ? prev.lastmod : today,
++        };
++    }
++    fs.writeFileSync(path.join(root, 'dist', 'lastmod.json'), JSON.stringify(lastmodManifest));
++    console.log('✓ Generated lastmod.json');
++
+     // Generate sitemap.xml (з hreflang-альтернативами UA/RU)
++    // Без: 404, сторінок пагінації ?page=N, карток без категорії (/catalog/unknown/, SEO-ТЗ завдання 5)
+     const ruBaseUrls = new Set(ruPages.map(p => p.baseUrl));
+     const urlsXml = pages
+-        .filter(page => page.url !== '/404/')
++        .filter(page => page.url !== '/404/' && !page.paginated && !page.url.includes('/catalog/unknown/'))
+         .map(page => {
+             const isHome = page.baseUrl === '/';
+             const alternates = ruBaseUrls.has(page.baseUrl) ? `
+@@ -163,6 +217,7 @@ async function generate() {
+             return `
+   <url>
+     <loc>${DOMAIN}${page.url}</loc>${alternates}
++    <lastmod>${lastmodManifest[page.url]?.lastmod || today}</lastmod>
+     <changefreq>${isHome ? 'daily' : 'weekly'}</changefreq>
+     <priority>${isHome ? '1.0' : '0.8'}</priority>
+   </url>`;
+@@ -190,4 +245,18 @@ Sitemap: ${DOMAIN}/sitemap.xml
+     console.log('SSG complete!');
+ }
+ 
++async function loadPrevLastmod() {
++    // Локальна перевірка без мережі: SITEMAP_LASTMOD_OFFLINE=1
++    if (process.env.SITEMAP_LASTMOD_OFFLINE === '1') return {};
++    try {
++        const res = await fetch(`${DOMAIN}/lastmod.json`, { signal: AbortSignal.timeout(10000) });
++        if (!res.ok) return {};
++        const data = await res.json();
++        return data && typeof data === 'object' ? data : {};
++    } catch (e) {
++        console.warn('⚠ Previous lastmod.json not loaded, using build date:', e.message);
++        return {};
++    }
++}
++
+ generate().catch(console.error);
+diff --git a/scripts/sync.js b/scripts/sync.js
+index e8d795d..8598d27 100644
+--- a/scripts/sync.js
++++ b/scripts/sync.js
+@@ -151,7 +151,7 @@ const parseVideos = (videoStr) => {
+   return videoStr.split(",").map((s) => {
+     const path = s.trim();
+     if (!path) return null;
+-    return `http://raznobyt.com/images/products/${path}`;
++    return `https://raznobyt.com/images/products/${path}`;
+   }).filter(Boolean);
+ };
+ 
+diff --git a/src/components/Category/CategoryView.jsx b/src/components/Category/CategoryView.jsx
+index af331da..759cbb6 100644
+--- a/src/components/Category/CategoryView.jsx
++++ b/src/components/Category/CategoryView.jsx
+@@ -6,6 +6,8 @@ import CategorySidebar from '../CategorySidebar';
+ import { textByCategory } from '../categoryText/catText.js';
+ import HeroSection from '../HeroSection';
+ import { getCompositionOption, getProductCompositionGroups } from '../../data/compositions.js';
++import { Link } from '../../i18n/router';
++import { CATEGORY_PAGE_SIZE, getTotalPages, pageQuery } from '../../lib/pagination';
+ 
+ const COLOR_MAP = {
+     navy: '#1A3B6E', white: '#F0F0F0', khaki: '#7B7B4E', blue: '#2563EB',
+@@ -13,7 +15,7 @@ const COLOR_MAP = {
+     multicam: '#6B7A4A', yellow: '#FACC15', beige: '#C8B99A', brown: '#5D4037',
+ };
+ 
+-const PAGE_SIZE = 9;
++const PAGE_SIZE = CATEGORY_PAGE_SIZE;
+ 
+ export const getProductSubcats = (product) => {
+     if (!product?.subcat) return [];
+@@ -45,6 +47,9 @@ export default function CategoryView({
+     const { lang, t } = useLang();
+     const targetRef = useRef(null);
+     const [mobileFilters, setMobileFilters] = useState(false);
++    // «Завантажити більше» дописує товари наступних сторінок без зміни URL;
++    // сама сторінка задається ?page=N (посилання пагінації нижче)
++    const [extraChunks, setExtraChunks] = useState(0);
+     const [expandedSections, setExpandedSections] = useState(['subcat', 'type', 'color', 'composition', 'width']);
+     const [mobileCols, setMobileCols] = useState(() => {
+         try {
+@@ -82,8 +87,10 @@ export default function CategoryView({
+ 
+             const filtersChanged = prevParams.toString() !== currentParams.toString();
+ 
+-            // Only scroll up if filters changed or page was reset/reduced
+-            if (!shouldSkipScroll && (filtersChanged || currentPage < prevPage)) {
++            setExtraChunks(0);
++
++            // Scroll up if filters changed or another page was opened
++            if (!shouldSkipScroll && (filtersChanged || currentPage !== prevPage)) {
+                 targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+             }
+ 
+@@ -212,21 +219,38 @@ export default function CategoryView({
+         });
+     }, [search, selectedSubcats, selectedTypes, selectedColors, selectedDensities, selectedWidths, selectedCompositions, products]);
+ 
+-    const visible = filtered.slice(0, page * PAGE_SIZE);
+-    const hasMore = visible.length < filtered.length;
++    const totalPages = getTotalPages(filtered.length, PAGE_SIZE);
++    const pageStart = (page - 1) * PAGE_SIZE;
++    const visible = filtered.slice(pageStart, pageStart + (1 + extraChunks) * PAGE_SIZE);
++    const visibleEnd = pageStart + visible.length;
++    const hasMore = visibleEnd < filtered.length;
++
++    // Посилання пагінації зберігають інші параметри (фільтри), змінюють лише page
++    const pageLink = (n) => {
++        const params = new URLSearchParams(locationSearch || '');
++        if (n > 1) params.set('page', String(n)); else params.delete('page');
++        const search = params.toString();
++        return { pathname: `/catalog/${cat.slug}/`, search: search ? `?${search}` : '' };
++    };
++    const pageWord = lang === 'ru' ? 'страница' : 'сторінка';
++    const seoPageSuffix = page > 1 ? ` — ${pageWord} ${page}` : '';
+ 
+     const catTextEntry = textByCategory[cat.id];
+     const TextComp = typeof catTextEntry === 'function' ? catTextEntry : (catTextEntry?.[lang] || catTextEntry?.ua || null);
+ 
+     return (
+         <>
+-            <SEO title={`${cat.title[lang]} — ${t('catalog.title')}`} description={cat.description[lang]} />
++            <SEO
++                title={`${cat.title[lang]} — ${t('catalog.title')}${seoPageSuffix}`}
++                description={`${cat.description[lang]}${seoPageSuffix}`}
++                query={pageQuery(page)}
++            />
+ 
+             <HeroSection
+                 title={cat.title[lang]}
+                 breadcrumbs={[
+                     { label: t('nav.home'), path: '/' },
+-                    { label: t('catalog.title'), path: '/catalog' },
++                    { label: t('catalog.title'), path: '/catalog/' },
+                     { label: cat.title[lang] }
+                 ]}
+                 className="category"
+@@ -410,18 +434,29 @@ export default function CategoryView({
+                                 </div>
+                                 {hasMore && (
+                                     <div className="load-more-wrap">
+-                                        <button className="btn btn-accent" onClick={() => setPage(p => p + 1)}>
+-                                            {t('catalog.loadMore')} ({filtered.length - visible.length})
++                                        <button className="btn btn-accent" onClick={() => setExtraChunks(n => n + 1)}>
++                                            {t('catalog.loadMore')} ({filtered.length - visibleEnd})
+                                         </button>
+                                     </div>
+                                 )}
++                                {totalPages > 1 && (
++                                    <nav className="catalog-pagination" aria-label={lang === 'ru' ? 'Страницы каталога' : 'Сторінки каталогу'}>
++                                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
++                                            n === page ? (
++                                                <span key={n} className="catalog-pagination__item active" aria-current="page">{n}</span>
++                                            ) : (
++                                                <Link key={n} to={pageLink(n)} className="catalog-pagination__item">{n}</Link>
++                                            )
++                                        ))}
++                                    </nav>
++                                )}
+                             </>
+                         )}
+                     </div>
+                 </div>
+ 
+                 {/* SEO Text Section */}
+-                {TextComp && (
++                {TextComp && page === 1 && (
+                     <div className="seo-text-section" style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid #e5e7eb', color: '#333333', fontSize: '0.875rem' }}>
+                         <TextComp />
+                     </div>
+diff --git a/src/components/CategoryHighlight.jsx b/src/components/CategoryHighlight.jsx
+index 470da5e..dd185e5 100644
+--- a/src/components/CategoryHighlight.jsx
++++ b/src/components/CategoryHighlight.jsx
+@@ -46,7 +46,7 @@ export default function CategoryHighlight({
+                     const itemTitle =
+                         lang === 'ru' && item.titleRu ? item.titleRu : item.title;
+ 
+-                    const href = item.link || (item.slug ? `/catalog/${item.slug}` : '#');
++                    const href = item.link || (item.slug ? `/catalog/${item.slug}/` : '#');
+ 
+                     return (
+                         <article key={item.id} className="cat-card">
+diff --git a/src/components/Home/HeroSlider.jsx b/src/components/Home/HeroSlider.jsx
+index bd7baea..b93aa5c 100644
+--- a/src/components/Home/HeroSlider.jsx
++++ b/src/components/Home/HeroSlider.jsx
+@@ -31,11 +31,11 @@ export default function HeroSlider({ onPriceClick }) {
+ 
+                 return (
+                     <div key={slide.id} className={`hero-slide ${isActive ? 'active' : ''}`}>
+-                        <div className="hero-slide__bg" aria-hidden="true">
++                        <div className="hero-slide__bg">
+                             {index === 0 ? (
+                                 <img
+                                     src={slide.image}
+-                                    alt=""
++                                    alt={lang === 'ru' ? 'Технические ткани разных цветов: рулоны твила для спецодежды' : 'Технічні тканини різних кольорів: рулони твілу для спецодягу'}
+                                     className="hero-slide__bg-img"
+                                     fetchPriority="high"
+                                     decoding="sync"
+@@ -54,7 +54,7 @@ export default function HeroSlider({ onPriceClick }) {
+                         <div className="hero-slide__overlay" />
+                         <div className="container" style={{ height: '100%' }}>
+                             <div className={`hero-slide__content align-${slide.align} ${isActive ? 'fade-in-active' : ''}`}>
+-                                <div className="hero__eyebrow">Голландські текстильні традиції</div>
++                                <div className="hero__eyebrow">{lang === 'ru' ? 'Голландские текстильные традиции' : 'Голландські текстильні традиції'}</div>
+                                 <h1 dangerouslySetInnerHTML={{ __html: t(`hero.title${slide.id}`) }} />
+                                 <p className="hero__sub">{t(`hero.subtitle${slide.id}`)}</p>
+                                 <div className="hero__btns">
+diff --git a/src/components/Navbar.jsx b/src/components/Navbar.jsx
+index 06ccd1c..dd1fc41 100644
+--- a/src/components/Navbar.jsx
++++ b/src/components/Navbar.jsx
+@@ -259,7 +259,7 @@ export default function Navbar() {
+ 
+         {/* CTA в мобільному меню */}
+         {/* <Link
+-          to="/contacts"
++          to="/contacts/"
+           className="mobile-menu__cta"
+           onClick={() => setMobileOpen(false)}
+         >
+diff --git a/src/components/Product/ProductView.jsx b/src/components/Product/ProductView.jsx
+index 569b9b3..1d64bec 100644
+--- a/src/components/Product/ProductView.jsx
++++ b/src/components/Product/ProductView.jsx
+@@ -143,24 +143,52 @@ export default function ProductView({ product, related = [] }) {
+ 
+     const catName = cat?.title?.[lang] || cat?.title?.ua || '';
+     const compStr = formatComposition(product?.attributes?.composition, lang);
+-    const fabricTypeStr = product?.attributes?.fabricType ? t(`fabricTypes.${product.attributes.fabricType}`) : '';
+-
+-    let seoDescription = rawDesc ? rawDesc.trim().slice(0, 160) : '';
+-    if (!seoDescription) {
+-        const descParts = [
+-            lang === 'ru'
+-                ? (productTitle ? `Ткань ${productTitle}` : 'Ткань')
+-                : (productTitle ? `Тканина ${productTitle}` : 'Тканина'),
+-            catName ? (lang === 'ru' ? `для категории "${catName}".` : `для категорії "${catName}".`) : '',
+-            compStr ? `${lang === 'ru' ? 'Состав' : 'Склад'}: ${compStr}.` : '',
+-            densityVal ? `${lang === 'ru' ? 'Плотность' : 'Щільність'}: ${densityVal}.` : '',
+-            widthVal ? `Ширина: ${widthVal}.` : '',
+-            lang === 'ua'
+-                ? 'Оптові поставки якісних тканин для спецодягу зі складу в Києві від Різнобит. Доставка по всій Україні.'
+-                : 'Оптовые поставки качественных тканей для спецодежды со склада в Киеве от Разнобыт. Доставка по всей Украине.'
++    // SEO-ТЗ T-20261119-01, завдання 3: title і description карток за шаблоном (H1 не змінюється)
++    const isRu = lang === 'ru';
++    const seoComp = compStr.replace(/ /g, ' ');
++    const seoDensity = String(product?.attributes?.density ?? '').replace(/\s*г\/м.*$/i, '').trim();
++    const seoWidth = String(product?.attributes?.width ?? '').replace(/\s*см\.?$/i, '').trim();
++    const fabricWord = isRu ? 'Ткань' : 'Тканина';
++    const seoArticle = fabricArticle.replace(/\s+/g, ' ').trim();
++    const densityPart = seoDensity ? `${seoDensity} г/м²` : '';
++
++    let seoTitle = `${fabricWord} ${seoArticle}`;
++    if (seoComp && densityPart) seoTitle += ` — ${seoComp}, ${densityPart}`;
++    else if (seoComp) seoTitle += ` — ${seoComp}`;
++    else if (densityPart) seoTitle += `, ${densityPart}`;
++    // 70 символів разом із « | Різнобит» — інакше варіант без складу (з категорією);
++    // якщо й він задовгий (довгий артикул) — без категорії
++    const fitsTitle = (str) => `${str} | Різнобит`.length <= 70;
++    if (!fitsTitle(seoTitle)) {
++        const shortTitle = [`${fabricWord} ${seoArticle}`, densityPart].filter(Boolean).join(', ');
++        seoTitle = catName && fitsTitle(`${shortTitle} — ${catName}`) ? `${shortTitle} — ${catName}` : shortTitle;
++    }
++
++    const truncateWords = (text, max) => {
++        if (text.length <= max) return text;
++        const cut = text.slice(0, max + 1);
++        const lastSpace = cut.lastIndexOf(' ');
++        return cut.slice(0, lastSpace > 0 ? lastSpace : max).replace(/[\s,;:—–-]+$/, '');
++    };
++
++    const baseDesc = rawDesc.trim();
++    let seoDescription = baseDesc;
++    if (baseDesc.length < 70) {
++        const lead = (baseDesc || `${fabricWord} ${seoArticle}`).replace(/[.\s]+$/, '');
++        const specs = [
++            seoComp && `${isRu ? 'Состав' : 'Склад'}: ${seoComp}`,
++            densityPart && `${isRu ? 'плотность' : 'щільність'} ${densityPart}`,
++            seoWidth && `ширина ${seoWidth} см`,
+         ].filter(Boolean);
+-        seoDescription = descParts.join(' ').slice(0, 160);
++        const specsStr = specs.length
++            ? `${specs[0].charAt(0).toUpperCase()}${specs[0].slice(1)}${specs.length > 1 ? `, ${specs.slice(1).join(', ')}` : ''}. `
++            : '';
++        const usp = isRu
++            ? 'Склад в Киеве, от 1 м, образцы, доставка по Украине.'
++            : 'Склад у Києві, від 1 м, зразки, доставка по Україні.';
++        seoDescription = `${lead}. ${specsStr}${usp}`;
+     }
++    seoDescription = truncateWords(seoDescription, 160);
+ 
+     const productSubcats = Array.isArray(product.subcat)
+         ? product.subcat
+@@ -234,11 +262,8 @@ export default function ProductView({ product, related = [] }) {
+     return (
+         <>
+             <SEO
+-                title={productTitle}
++                title={seoTitle}
+                 description={seoDescription}
+-                keywords={lang === 'ru'
+-                    ? `ткань, ${catName}, ${fabricTypeStr}, спецодежда`
+-                    : `тканина, ${catName}, ${fabricTypeStr}, спецодяг`}
+             />
+ 
+             <div className="product-page">
+@@ -513,7 +538,7 @@ export default function ProductView({ product, related = [] }) {
+                                         playsInline
+                                         onError={(e) => { e.target.closest('.product-video-item-wrap')?.remove(); }}
+                                     >
+-                                        <source src={url} />
++                                        <source src={String(url).replace(/^http:\/\/(www\.)?raznobyt\.com\//i, '/')} />
+                                     </video>
+                                 ))}
+                             </div>
+@@ -550,7 +575,7 @@ export default function ProductView({ product, related = [] }) {
+                     {related.length > 0 && (
+                         <div>
+                             <div className="section__header" style={{ textAlign: 'left', marginBottom: 28 }}>
+-                                <div className="section__eyebrow">Також цікаво</div>
++                                <div className="section__eyebrow">{lang === 'ru' ? 'Также интересно' : 'Також цікаво'}</div>
+                                 <h2 className="section__title" style={{ fontSize: 28 }}>{t('product.relatedProducts')}</h2>
+                             </div>
+                             <div className="products-grid">
+diff --git a/src/components/ProductCard.jsx b/src/components/ProductCard.jsx
+index efeb092..5cb15aa 100644
+--- a/src/components/ProductCard.jsx
++++ b/src/components/ProductCard.jsx
+@@ -106,13 +106,13 @@ export default function ProductCard({ product }) {
+             )}
+             {product.attributes.density && (
+               <div className="product-character-row">
+-                <div className="product-character-label">Щільність:</div>
++                <div className="product-character-label">{lang === 'ru' ? 'Плотность:' : 'Щільність:'}</div>
+                 <div className="product-character-value">{product.attributes.density} г/м.кв</div>
+               </div>
+             )}
+             {product.attributes.composition && formatComposition(product.attributes.composition, lang) && (
+               <div className="product-character-row">
+-                <div className="product-character-label">Склад:</div>
++                <div className="product-character-label">{lang === 'ru' ? 'Состав:' : 'Склад:'}</div>
+                 <div className="product-character-value">
+                   {getCompositionParts(product.attributes.composition, lang).map((part, idx, arr) => (
+                     <span
+diff --git a/src/components/Reviews.jsx b/src/components/Reviews.jsx
+index 12a483d..ca27b48 100644
+--- a/src/components/Reviews.jsx
++++ b/src/components/Reviews.jsx
+@@ -131,7 +131,7 @@ export default function Reviews() {
+                             </p>
+ 
+                             <div className="review-card__footer">
+-                                <span className="review-card__date">{review.date}</span>
++                                <span className="review-card__date">{lang === 'ru' ? review.date.replace('років тому', 'лет назад') : review.date}</span>
+                                 <span className="review-card__source">Google</span>
+                             </div>
+                         </article>
+diff --git a/src/components/SEO/index.jsx b/src/components/SEO/index.jsx
+index 1806091..3eb8256 100644
+--- a/src/components/SEO/index.jsx
++++ b/src/components/SEO/index.jsx
+@@ -6,15 +6,16 @@ export const SITE_URL = 'https://raznobyt.com';
+ 
+ const OG_LOCALE = { ua: 'uk_UA', ru: 'ru_UA' };
+ 
+-export default function SEO({ title, description, keywords, noindex = false }) {
++// query: суфікс для сторінок пагінації (напр. '?page=2') — canonical і hreflang вказують на ту саму сторінку
++export default function SEO({ title, description, noindex = false, query = '', brandSuffix = true }) {
+     const { lang } = useLang();
+     const { pathname } = useLocation();
+     const siteName = 'Різнобит';
+-    const fullTitle = title ? `${title} | ${siteName}` : siteName;
++    const fullTitle = title ? (brandSuffix ? `${title} | ${siteName}` : title) : siteName;
+ 
+     const basePath = stripLang(pathname);
+-    const uaUrl = SITE_URL + localizePath(basePath, 'ua');
+-    const ruUrl = SITE_URL + localizePath(basePath, 'ru');
++    const uaUrl = SITE_URL + localizePath(basePath, 'ua') + query;
++    const ruUrl = SITE_URL + localizePath(basePath, 'ru') + query;
+     const canonical = lang === 'ru' ? ruUrl : uaUrl;
+ 
+     return (
+@@ -22,7 +23,6 @@ export default function SEO({ title, description, keywords, noindex = false }) {
+             <html lang={HTML_LANG[lang]} />
+             <title>{fullTitle}</title>
+             {description && <meta name="description" content={description} />}
+-            {keywords && <meta name="keywords" content={keywords} />}
+             {noindex && <meta name="robots" content="noindex" />}
+             <meta property="og:title" content={fullTitle} />
+             {description && <meta property="og:description" content={description} />}
+diff --git a/src/index.css b/src/index.css
+index a1f595c..4871dde 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -2737,6 +2737,40 @@ a.lang-btn {
+   margin-top: 40px;
+ }
+ 
++/* Пагінація категорій (посилання ?page=N) */
++.catalog-pagination {
++  display: flex;
++  flex-wrap: wrap;
++  justify-content: center;
++  gap: 6px;
++  margin-top: 24px;
++}
++
++.catalog-pagination__item {
++  min-width: 40px;
++  height: 40px;
++  padding: 0 10px;
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  border: 1px solid var(--c-border);
++  border-radius: var(--radius-sm);
++  color: var(--c-text);
++  font-weight: 500;
++  text-decoration: none;
++}
++
++.catalog-pagination__item:hover {
++  border-color: var(--c-accent);
++  color: var(--c-accent);
++}
++
++.catalog-pagination__item.active {
++  background: var(--c-accent);
++  border-color: var(--c-accent);
++  color: #fff;
++}
++
+ .color-swatch {
+   display: inline-block;
+   width: 14px;
+diff --git a/src/pages/AboutUs.jsx b/src/pages/AboutUs.jsx
+index aa33b57..e7901ba 100644
+--- a/src/pages/AboutUs.jsx
++++ b/src/pages/AboutUs.jsx
+@@ -15,7 +15,10 @@ export default function AboutUs() {
+     return (
+         <>
+             <SEO
+-                title={t('about.title') + " - Різнобит"}
++                title={lang === 'ru'
++                    ? 'О компании Різнобит — поставщик технических тканей'
++                    : 'Про компанію Різнобит — постачальник технічних тканин'}
++                brandSuffix={false}
+                 description={t('about.subtitle')}
+             />
+ 
+@@ -87,7 +90,7 @@ export default function AboutUs() {
+                 <div className="container" style={{ textAlign: 'center' }}>
+                     <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(24px,4vw,38px)', color: '#fff', marginBottom: 12 }}>{t('about.ctaTitle')}</h2>
+                     <p style={{ color: 'rgba(255,255,255,0.8)', marginBottom: 28, fontSize: 15 }}>{t('about.ctaText')}</p>
+-                    <Link to="/contacts" className="btn btn-primary" style={{ marginTop: 32 }}>
++                    <Link to="/contacts/" className="btn btn-primary" style={{ marginTop: 32 }}>
+                         {t('about.ctaButton')}
+                     </Link>
+                 </div>
+diff --git a/src/pages/Blog.jsx b/src/pages/Blog.jsx
+index d3c0836..5220be8 100644
+--- a/src/pages/Blog.jsx
++++ b/src/pages/Blog.jsx
+@@ -27,7 +27,6 @@ export default function Blog() {
+             <SEO
+                 title={t('blog.title') || 'Блог'}
+                 description={t('blog.subtitle')}
+-                keywords={lang === 'ru' ? 'блог, новости, ткани, спецодежда' : 'блог, новини, тканини, спецодяг'}
+             />
+ 
+             <HeroSection
+diff --git a/src/pages/CategoryPage.jsx b/src/pages/CategoryPage.jsx
+index 553d550..dd4bd9f 100644
+--- a/src/pages/CategoryPage.jsx
++++ b/src/pages/CategoryPage.jsx
+@@ -3,6 +3,7 @@ import { useParams, useLocation, useSearchParams } from 'react-router-dom';
+ import { Navigate } from '../i18n/router';
+ import withRouter from '../lib/withRouter';
+ import { getProductsByCategory } from '../lib/products';
++import staticProducts from '../data/products.js';
+ import categories from '../data/categories.json';
+ import CategoryView from '../components/Category/CategoryView';
+ 
+@@ -10,10 +11,10 @@ function CategoryPage({ slug: externalSlug = null }) {
+   const { slug: paramSlug } = useParams();
+   const location = useLocation();
+   const [searchParams, setSearchParams] = useSearchParams();
+-  const [products, setProducts] = useState([]);
+-
+   const slug = externalSlug ?? paramSlug;
+   const cat = categories.find(c => c.slug === slug);
++  // Товари доступні синхронно, щоб вони потрапили в пререндерений HTML (SEO-ТЗ, завдання 4)
++  const [products, setProducts] = useState(() => (cat ? staticProducts.filter(p => p.category === cat.id) : []));
+ 
+   // Redirect /catalog/:slug → /catalog/:slug/ (only relevant inside BrowserRouter)
+   const expectedPath = `/catalog/${slug}/`;
+@@ -21,7 +22,7 @@ function CategoryPage({ slug: externalSlug = null }) {
+     return <Navigate to={expectedPath} replace />;
+   }
+ 
+-  if (!cat) return <Navigate to="/catalog" replace />;
++  if (!cat) return <Navigate to="/catalog/" replace />;
+ 
+   // eslint-disable-next-line react-hooks/rules-of-hooks
+   useEffect(() => {
+@@ -78,7 +79,8 @@ function CategoryPage({ slug: externalSlug = null }) {
+   const selectedDensities = getArray('densities');
+   const selectedWidths = getArray('widths');
+   const selectedCompositions = getArray('compositions');
+-  const page = parseInt(searchParams.get('page') || '1', 10);
++  const parsedPage = parseInt(searchParams.get('page') || '1', 10);
++  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+ 
+   const setSearch = (val) => update({ q: val, page: undefined });
+   const setSelectedSubcats = (arr) => update({ subcats: arr, page: undefined });
+diff --git a/src/pages/Delivery.jsx b/src/pages/Delivery.jsx
+index 9696928..7303792 100644
+--- a/src/pages/Delivery.jsx
++++ b/src/pages/Delivery.jsx
+@@ -5,12 +5,12 @@ import HeroSection from '../components/HeroSection';
+ import dostavka from '../assets/images/dostavka.webp';
+ 
+ export default function Delivery() {
+-  const { t } = useLang();
++  const { t, lang } = useLang();
+ 
+   return (
+     <>
+       <SEO
+-        title={`${t('delivery.title')} — Різнобит`}
++        title={lang === 'ru' ? 'Доставка и оплата тканей по Украине' : 'Доставка та оплата тканин по Україні'}
+         description={t('delivery.subtitle')}
+       />
+ 
+diff --git a/src/pages/Home.jsx b/src/pages/Home.jsx
+index e6aaa50..fbf40e3 100644
+--- a/src/pages/Home.jsx
++++ b/src/pages/Home.jsx
+@@ -20,10 +20,10 @@ import FAQ from '../components/FAQ';
+ import canvasAll from '../assets/images/canvas.webp';
+ 
+ const WHY_ICONS = [
+-  <svg key="1" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>,
+-  <svg key="2" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>,
+-  <svg key="3" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>,
+-  <svg key="4" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
++  <svg key="1" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>,
++  <svg key="2" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>,
++  <svg key="3" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>,
++  <svg key="4" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
+ ];
+ 
+ function Home() {
+@@ -39,9 +39,6 @@ function Home() {
+         description={lang === 'ru'
+           ? 'Качественные технические и специальные ткани для бизнеса. Рабочая одежда, медицинские ткани, армейские материалы.'
+           : 'Якісні технічні та спеціальні тканини для бізнесу. Робочий одяг, медичні тканини, армійські матеріали.'}
+-        keywords={lang === 'ru'
+-          ? 'ткани, спецодежда, медицинские ткани, рабочая одежда, текстиль'
+-          : 'тканини, спецодяг, медичні тканини, робочий одяг, текстиль'}
+       />
+ 
+       <HeroSlider onPriceClick={() => setIsPricePopupOpen(true)} />
+@@ -95,7 +92,7 @@ function Home() {
+           </Link>
+         </div>
+         {/* <div style={{ textAlign: 'center', marginTop: 36 }}>
+-          <Link to="/catalog" className="btn btn-accent">
++          <Link to="/catalog/" className="btn btn-accent">
+             {lang === 'ua' ? 'Всі категорії' : 'Все категории'}
+           </Link>
+         </div> */}
+@@ -135,7 +132,7 @@ function Home() {
+             {featured.map(p => <ProductCard key={p.id} product={p} />)}
+           </div>
+           <div style={{ textAlign: 'center', marginTop: 36 }}>
+-            <Link to="/catalog" className="btn btn-accent">{t('hero.cta')}</Link>
++            <Link to="/catalog/" className="btn btn-accent">{t('hero.cta')}</Link>
+           </div>
+         </div>
+       </section>
+@@ -174,7 +171,7 @@ function Home() {
+               ? 'Наші менеджери допоможуть підібрати тканину під ваші вимоги'
+               : 'Наши менеджеры помогут подобрать ткань под ваши требования'}
+           </p>
+-          <Link to="/contacts" className="btn" style={{ background: '#fff', color: 'var(--c-accent)', fontWeight: 700 }}>
++          <Link to="/contacts/" className="btn" style={{ background: '#fff', color: 'var(--c-accent)', fontWeight: 700 }}>
+             {t('hero.cta2')} →
+           </Link>
+         </div>
+diff --git a/src/pages/News.jsx b/src/pages/News.jsx
+index c0399c4..b370dac 100644
+--- a/src/pages/News.jsx
++++ b/src/pages/News.jsx
+@@ -27,7 +27,6 @@ export default function News() {
+             <SEO
+                 title={t('news.title') || 'Новини'}
+                 description={t('news.subtitle')}
+-                keywords={lang === 'ru' ? 'новости, ткани, спецодежда' : 'новини, тканини, спецодяг'}
+             />
+ 
+             <HeroSection
+diff --git a/src/pages/NotFound.jsx b/src/pages/NotFound.jsx
+index becd16f..756cb07 100644
+--- a/src/pages/NotFound.jsx
++++ b/src/pages/NotFound.jsx
+@@ -46,7 +46,7 @@ export default function NotFound() {
+               <Link to="/" className="btn btn-accent">
+                 {strings.backHome}
+               </Link>
+-              <Link to="/catalog" className="btn btn btn-primary">
++              <Link to="/catalog/" className="btn btn btn-primary">
+                 {strings.toCatalog}
+               </Link>
+             </div>
+diff --git a/src/pages/ProductPage.jsx b/src/pages/ProductPage.jsx
+index 1296521..25c7225 100644
+--- a/src/pages/ProductPage.jsx
++++ b/src/pages/ProductPage.jsx
+@@ -28,7 +28,7 @@ function ProductPage({ slug: externalSlug = null, initialProduct = null }) {
+     }
+   }, [slug, initialProduct]);
+ 
+-  if (!product) return <Navigate to="/catalog" replace />;
++  if (!product) return <Navigate to="/catalog/" replace />;
+ 
+   return <ProductView product={product} related={related} />;
+ }
+diff --git a/src/lib/pagination.js b/src/lib/pagination.js
+new file mode 100644
+index 0000000..7abaa09
+--- /dev/null
++++ b/src/lib/pagination.js
+@@ -0,0 +1,12 @@
++// Пагінація категорій (SEO-ТЗ T-20261119-01, завдання 4).
++// Спільна для CategoryView (рендер) і scripts/generate.js (пререндер сторінок ?page=N).
++export const CATEGORY_PAGE_SIZE = 9;
++
++export function getTotalPages(count, pageSize = CATEGORY_PAGE_SIZE) {
++    return Math.max(1, Math.ceil(count / pageSize));
++}
++
++// '?page=N' лише для N ≥ 2; перша сторінка — без параметра
++export function pageQuery(page) {
++    return page > 1 ? `?page=${page}` : '';
++}

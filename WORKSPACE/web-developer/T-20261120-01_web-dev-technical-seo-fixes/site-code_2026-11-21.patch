@@ -1,0 +1,527 @@
+diff --git a/.github/workflows/deploy.yml b/.github/workflows/deploy.yml
+index 2ad5845..f3db01e 100644
+--- a/.github/workflows/deploy.yml
++++ b/.github/workflows/deploy.yml
+@@ -30,6 +30,14 @@ jobs:
+       - name: Generate optimized product images
+         run: npm run images:generate
+ 
++      # Реєстр дат <lastmod> для sitemap.xml (scripts/generate.js) між збірками; на сайт не потрапляє
++      - name: Restore sitemap lastmod manifest
++        uses: actions/cache/restore@v4
++        with:
++          path: lastmod-manifest.json
++          key: lastmod-manifest-${{ github.run_id }}-${{ github.run_attempt }}
++          restore-keys: lastmod-manifest-
++
+       - name: Build project
+         run: npm run build
+ 
+@@ -42,3 +50,9 @@ jobs:
+           server-dir: ${{ secrets.FTP_PATH }}
+           local-dir: dist/
+           dangerous-clean-slate: false
++
++      - name: Save sitemap lastmod manifest
++        uses: actions/cache/save@v4
++        with:
++          path: lastmod-manifest.json
++          key: lastmod-manifest-${{ github.run_id }}-${{ github.run_attempt }}
+diff --git a/.gitignore b/.gitignore
+index c757323..32a8979 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -30,6 +30,9 @@ yarn-debug.log*
+ yarn-error.log*
+ pnpm-debug.log*
+ 
++# Sitemap <lastmod> registry (build state; kept between CI runs via actions/cache)
++lastmod-manifest.json
++
+ # Local cache
+ *.local
+ .cache/
+diff --git a/scripts/generate.js b/scripts/generate.js
+index 1ffc301..88206f3 100644
+--- a/scripts/generate.js
++++ b/scripts/generate.js
+@@ -68,17 +68,16 @@ async function generate() {
+         pages.push({ url: `/catalog/${cat.slug}/`, component: 'CategoryPage', props: { slug: cat.slug } });
+     }
+ 
+-    // Сторінки пагінації категорій ?page=N (N ≥ 2): окремі файли page-N.html,
+-    // nginx віддає їх за запитом /catalog/<slug>/?page=N (див. конфіг для CEO). У sitemap не потрапляють.
++    // Сторінки пагінації категорій /catalog/<slug>/page/<N>/ (N ≥ 2) — окремі статичні файли
++    // catalog/<slug>/page/<N>/index.html (SEO-ТЗ brief_web-developer_pagination-static). У sitemap не потрапляють.
+     for (const cat of categories) {
+         const count = products.filter(p => p.category === cat.id).length;
+         const totalPages = getTotalPages(count, CATEGORY_PAGE_SIZE);
+         for (let n = 2; n <= totalPages; n++) {
+             pages.push({
+-                url: `/catalog/${cat.slug}/?page=${n}`,
++                url: `/catalog/${cat.slug}/page/${n}/`,
+                 component: 'CategoryPage',
+-                props: { slug: cat.slug },
+-                outFile: `/catalog/${cat.slug}/page-${n}.html`,
++                props: { slug: cat.slug, page: n },
+                 paginated: true,
+             });
+         }
+@@ -96,7 +95,6 @@ async function generate() {
+         .map(p => ({
+             ...p,
+             url: p.url === '/' ? '/ru/' : `/ru${p.url}`,
+-            outFile: p.outFile ? `/ru${p.outFile}` : undefined,
+             lang: 'ru',
+             baseUrl: p.url,
+         }));
+@@ -105,11 +103,8 @@ async function generate() {
+ 
+     console.log(`Pre-rendering ${pages.length} pages...`);
+ 
+-    // Хеш змісту сторінки для <lastmod>: без хешів файлів збірки й ?v=<версія>, які змінюються щозбірки
++    // Хеш значущого вмісту сторінки для <lastmod> (SEO-ТЗ brief_web-developer_sitemap-lastmod)
+     const contentHashes = new Map();
+-    const normalizeForHash = (str) => String(str || '')
+-        .replace(/([?&])v=\d+/g, '$1')
+-        .replace(/-[A-Za-z0-9_-]{8}(\.(?:js|css|webp|png|jpe?g|svg|gif|avif|woff2?|pdf|p7s|docx?|xml))/g, '$1');
+ 
+     for (const page of pages) {
+         const { url, component, props = {} } = page;
+@@ -117,10 +112,7 @@ async function generate() {
+         try {
+             const { appHtml, helmet } = await render(url, component, props);
+ 
+-            contentHashes.set(url, crypto.createHash('sha1')
+-                .update(normalizeForHash(appHtml))
+-                .update(normalizeForHash(helmet ? `${helmet.title}${helmet.meta}${helmet.link}` : ''))
+-                .digest('hex'));
++            contentHashes.set(url, hashSignificantContent(appHtml, helmet));
+ 
+             let html = template.replace('<!--app-html-->', appHtml);
+ 
+@@ -143,19 +135,16 @@ async function generate() {
+                 );
+             }
+ 
+-            let targetFile;
+-            if (page.outFile) {
+-                targetFile = path.join(root, 'dist', page.outFile);
+-            } else {
+-                let targetDir = path.join(root, 'dist');
+-                if (url !== '/') {
+-                    targetDir = path.join(root, 'dist', url.endsWith('/') ? url.slice(0, -1) : url);
+-                }
+-                targetFile = path.join(targetDir, 'index.html');
++            let targetDir = path.join(root, 'dist');
++            if (url !== '/') {
++                targetDir = path.join(root, 'dist', url.endsWith('/') ? url.slice(0, -1) : url);
++            }
++
++            if (!fs.existsSync(targetDir)) {
++                fs.mkdirSync(targetDir, { recursive: true });
+             }
+ 
+-            fs.mkdirSync(path.dirname(targetFile), { recursive: true });
+-            fs.writeFileSync(targetFile, html);
++            fs.writeFileSync(path.join(targetDir, 'index.html'), html);
+             console.log(`✓ Rendered ${url}`);
+         } catch (e) {
+             console.error(`X Error rendering ${url}:`, e.message);
+@@ -188,26 +177,37 @@ async function generate() {
+     console.log('Injecting critical CSS into all pages...');
+     await injectCriticalCss();
+ 
+-    // <lastmod>: дата зберігається, доки зміст сторінки не змінився.
+-    // Попередній маніфест береться з живого сайту (/lastmod.json); якщо його немає — дата поточної збірки.
+-    const today = new Date().toISOString().slice(0, 10);
+-    const prevLastmod = await loadPrevLastmod();
++    // Сторінки sitemap: без 404, пагінації /page/N/ і карток без категорії (/catalog/unknown/)
++    const sitemapPages = pages
++        .filter(page => page.url !== '/404/' && !page.paginated && !page.url.includes('/catalog/unknown/'));
++
++    // <lastmod>: дата лишається, доки хеш значущого вмісту сторінки не змінився.
++    // Реєстр lastmod-manifest.json лежить у корені проєкту (не в dist/, на сайт не потрапляє);
++    // у GitHub Actions зберігається між збірками через actions/cache (див. deploy.yml).
++    const buildTime = new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
++    const manifestPath = path.join(root, 'lastmod-manifest.json');
++    let prevManifest = {};
++    try {
++        prevManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) || {};
++    } catch {
++        console.log('No lastmod-manifest.json found, all pages get the build time');
++    }
+     const lastmodManifest = {};
+-    for (const [url, hash] of contentHashes) {
+-        const prev = prevLastmod[url];
+-        lastmodManifest[url] = {
+-            hash,
+-            lastmod: prev && prev.hash === hash && /^\d{4}-\d{2}-\d{2}$/.test(prev.lastmod) ? prev.lastmod : today,
+-        };
++    for (const page of sitemapPages) {
++        const hash = contentHashes.get(page.url);
++        if (!hash) continue;
++        const prev = prevManifest[page.url];
++        const keepPrev = prev && prev.hash === hash
++            && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/.test(prev.lastmod)
++            && prev.lastmod <= buildTime;
++        lastmodManifest[page.url] = { hash, lastmod: keepPrev ? prev.lastmod : buildTime };
+     }
+-    fs.writeFileSync(path.join(root, 'dist', 'lastmod.json'), JSON.stringify(lastmodManifest));
+-    console.log('✓ Generated lastmod.json');
++    fs.writeFileSync(manifestPath, JSON.stringify(lastmodManifest, null, 1));
++    console.log('✓ Updated lastmod-manifest.json');
+ 
+     // Generate sitemap.xml (з hreflang-альтернативами UA/RU)
+-    // Без: 404, сторінок пагінації ?page=N, карток без категорії (/catalog/unknown/, SEO-ТЗ завдання 5)
+     const ruBaseUrls = new Set(ruPages.map(p => p.baseUrl));
+-    const urlsXml = pages
+-        .filter(page => page.url !== '/404/' && !page.paginated && !page.url.includes('/catalog/unknown/'))
++    const urlsXml = sitemapPages
+         .map(page => {
+             const isHome = page.baseUrl === '/';
+             const alternates = ruBaseUrls.has(page.baseUrl) ? `
+@@ -216,8 +216,8 @@ async function generate() {
+     <xhtml:link rel="alternate" hreflang="x-default" href="${DOMAIN}${page.baseUrl}"/>` : '';
+             return `
+   <url>
+-    <loc>${DOMAIN}${page.url}</loc>${alternates}
+-    <lastmod>${lastmodManifest[page.url]?.lastmod || today}</lastmod>
++    <loc>${DOMAIN}${page.url}</loc>
++    <lastmod>${lastmodManifest[page.url]?.lastmod || buildTime}</lastmod>${alternates}
+     <changefreq>${isHome ? 'daily' : 'weekly'}</changefreq>
+     <priority>${isHome ? '1.0' : '0.8'}</priority>
+   </url>`;
+@@ -245,18 +245,54 @@ Sitemap: ${DOMAIN}/sitemap.xml
+     console.log('SSG complete!');
+ }
+ 
+-async function loadPrevLastmod() {
+-    // Локальна перевірка без мережі: SITEMAP_LASTMOD_OFFLINE=1
+-    if (process.env.SITEMAP_LASTMOD_OFFLINE === '1') return {};
+-    try {
+-        const res = await fetch(`${DOMAIN}/lastmod.json`, { signal: AbortSignal.timeout(10000) });
+-        if (!res.ok) return {};
+-        const data = await res.json();
+-        return data && typeof data === 'object' ? data : {};
+-    } catch (e) {
+-        console.warn('⚠ Previous lastmod.json not loaded, using build date:', e.message);
+-        return {};
++// Прибирає з HTML елемент, що починається з позиції start, разом із вкладеними однойменними тегами
++function removeElementAt(html, start) {
++    const tag = html.slice(start + 1).match(/^[a-zA-Z0-9]+/)[0];
++    const re = new RegExp(`<(/?)${tag}\\b[^>]*>`, 'g');
++    re.lastIndex = start;
++    let depth = 0;
++    let m;
++    while ((m = re.exec(html))) {
++        if (m[1]) depth--;
++        else if (!m[0].endsWith('/>')) depth++;
++        if (depth === 0) return html.slice(0, start) + html.slice(re.lastIndex);
+     }
++    return html.slice(0, start);
++}
++
++// Значущий вміст: title, description і <main> без шапки, меню, футера, <script>/<style>
++// та блоків із data-lastmod-ignore («Схожі товари»); нормалізація пробілів, хешів збірки й ?v=
++function hashSignificantContent(appHtml, helmet) {
++    let main = String(appHtml || '');
++    const mainStart = main.indexOf('<main');
++    const mainEnd = main.lastIndexOf('</main>');
++    if (mainStart !== -1 && mainEnd !== -1) main = main.slice(mainStart, mainEnd);
++
++    let idx;
++    while ((idx = main.indexOf('data-lastmod-ignore')) !== -1) {
++        const start = main.lastIndexOf('<', idx);
++        main = removeElementAt(main, start);
++    }
++
++    main = main
++        .replace(/<script[\s\S]*?<\/script>/gi, '')
++        .replace(/<style[\s\S]*?<\/style>/gi, '')
++        .replace(/<!--[\s\S]*?-->/g, '')
++        .replace(/([?&])v=\d+/g, '$1')
++        .replace(/-[A-Za-z0-9_-]{8}(\.(?:js|css|webp|png|jpe?g|svg|gif|avif|woff2?|pdf|p7s|docx?|xml))/g, '$1')
++        .replace(/\s+/g, ' ')
++        .trim();
++
++    const title = helmet ? helmet.title.toString() : '';
++    const descMatch = helmet ? helmet.meta.toString().match(/<meta[^>]*name="description"[^>]*>/) : null;
++
++    return crypto.createHash('sha256')
++        .update(title.replace(/\s+/g, ' ').trim())
++        .update('\n')
++        .update(descMatch ? descMatch[0] : '')
++        .update('\n')
++        .update(main)
++        .digest('hex');
+ }
+ 
+ generate().catch(console.error);
+diff --git a/src/App.jsx b/src/App.jsx
+index 8187757..5b15173 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -33,6 +33,7 @@ const ROUTES = {
+   ],
+   dynamic: [
+     { path: '/catalog/:slug/', element: <CategoryPage /> },
++    { path: '/catalog/:slug/page/:page/', element: <CategoryPage /> },
+     { path: '/catalog/:category/:slug/', element: <ProductPage /> },
+   ],
+ };
+diff --git a/src/components/Category/CategoryView.jsx b/src/components/Category/CategoryView.jsx
+index 759cbb6..1aecfaa 100644
+--- a/src/components/Category/CategoryView.jsx
++++ b/src/components/Category/CategoryView.jsx
+@@ -7,7 +7,7 @@ import { textByCategory } from '../categoryText/catText.js';
+ import HeroSection from '../HeroSection';
+ import { getCompositionOption, getProductCompositionGroups } from '../../data/compositions.js';
+ import { Link } from '../../i18n/router';
+-import { CATEGORY_PAGE_SIZE, getTotalPages, pageQuery } from '../../lib/pagination';
++import { CATEGORY_PAGE_SIZE, getTotalPages } from '../../lib/pagination';
+ 
+ const COLOR_MAP = {
+     navy: '#1A3B6E', white: '#F0F0F0', khaki: '#7B7B4E', blue: '#2563EB',
+@@ -48,7 +48,7 @@ export default function CategoryView({
+     const targetRef = useRef(null);
+     const [mobileFilters, setMobileFilters] = useState(false);
+     // «Завантажити більше» дописує товари наступних сторінок без зміни URL;
+-    // сама сторінка задається ?page=N (посилання пагінації нижче)
++    // сама сторінка задається адресою /page/N/ (посилання пагінації нижче)
+     const [extraChunks, setExtraChunks] = useState(0);
+     const [expandedSections, setExpandedSections] = useState(['subcat', 'type', 'color', 'composition', 'width']);
+     const [mobileCols, setMobileCols] = useState(() => {
+@@ -68,35 +68,25 @@ export default function CategoryView({
+         }
+     };
+ 
+-    // Scroll to product block when filters change or page resets/decreases
++    // Scroll to product block when filters change or another page (/page/N/) is opened
+     const skipScrollRef = useRef(false);
+     const prevSearch = useRef(locationSearch);
++    const prevPageRef = useRef(page);
+     useEffect(() => {
+-        if (prevSearch.current !== locationSearch) {
++        if (prevSearch.current !== locationSearch || prevPageRef.current !== page) {
+             const shouldSkipScroll = skipScrollRef.current;
+             skipScrollRef.current = false;
+ 
+-            const prevParams = new URLSearchParams(prevSearch.current);
+-            const currentParams = new URLSearchParams(locationSearch);
+-
+-            const prevPage = parseInt(prevParams.get('page') || '1', 10);
+-            const currentPage = parseInt(currentParams.get('page') || '1', 10);
+-
+-            prevParams.delete('page');
+-            currentParams.delete('page');
+-
+-            const filtersChanged = prevParams.toString() !== currentParams.toString();
+-
+             setExtraChunks(0);
+ 
+-            // Scroll up if filters changed or another page was opened
+-            if (!shouldSkipScroll && (filtersChanged || currentPage !== prevPage)) {
++            if (!shouldSkipScroll) {
+                 targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+             }
+ 
+             prevSearch.current = locationSearch;
++            prevPageRef.current = page;
+         }
+-    }, [locationSearch]);
++    }, [locationSearch, page]);
+ 
+     const { FABRIC_TYPES, COLORS, DENSITIES, WIDTHS, COMPOSITIONS, SUBCATS } = useMemo(() => {
+         const types = new Set();
+@@ -225,15 +215,19 @@ export default function CategoryView({
+     const visibleEnd = pageStart + visible.length;
+     const hasMore = visibleEnd < filtered.length;
+ 
+-    // Посилання пагінації зберігають інші параметри (фільтри), змінюють лише page
++    // Посилання пагінації: /catalog/<slug>/ і /catalog/<slug>/page/<N>/; фільтри (query) зберігаються
+     const pageLink = (n) => {
+         const params = new URLSearchParams(locationSearch || '');
+-        if (n > 1) params.set('page', String(n)); else params.delete('page');
++        params.delete('page');
+         const search = params.toString();
+-        return { pathname: `/catalog/${cat.slug}/`, search: search ? `?${search}` : '' };
++        return {
++            pathname: n > 1 ? `/catalog/${cat.slug}/page/${n}/` : `/catalog/${cat.slug}/`,
++            search: search ? `?${search}` : '',
++        };
+     };
+     const pageWord = lang === 'ru' ? 'страница' : 'сторінка';
+-    const seoPageSuffix = page > 1 ? ` — ${pageWord} ${page}` : '';
++    const seoTitleSuffix = page > 1 ? ` — ${pageWord} ${page}` : '';
++    const seoDescSuffix = page > 1 ? ` ${lang === 'ru' ? 'Страница' : 'Сторінка'} ${page}.` : '';
+ 
+     const catTextEntry = textByCategory[cat.id];
+     const TextComp = typeof catTextEntry === 'function' ? catTextEntry : (catTextEntry?.[lang] || catTextEntry?.ua || null);
+@@ -241,9 +235,8 @@ export default function CategoryView({
+     return (
+         <>
+             <SEO
+-                title={`${cat.title[lang]} — ${t('catalog.title')}${seoPageSuffix}`}
+-                description={`${cat.description[lang]}${seoPageSuffix}`}
+-                query={pageQuery(page)}
++                title={`${cat.title[lang]} — ${t('catalog.title')}${seoTitleSuffix}`}
++                description={`${cat.description[lang]}${seoDescSuffix && !/[.!?]$/.test(cat.description[lang]) ? '.' : ''}${seoDescSuffix}`}
+             />
+ 
+             <HeroSection
+diff --git a/src/components/Product/ProductView.jsx b/src/components/Product/ProductView.jsx
+index 1d64bec..ddf1049 100644
+--- a/src/components/Product/ProductView.jsx
++++ b/src/components/Product/ProductView.jsx
+@@ -573,7 +573,8 @@ export default function ProductView({ product, related = [] }) {
+                     )}
+ 
+                     {related.length > 0 && (
+-                        <div>
++                        // data-lastmod-ignore: блок «Схожі товари» не впливає на <lastmod> у sitemap
++                        <div data-lastmod-ignore="true">
+                             <div className="section__header" style={{ textAlign: 'left', marginBottom: 28 }}>
+                                 <div className="section__eyebrow">{lang === 'ru' ? 'Также интересно' : 'Також цікаво'}</div>
+                                 <h2 className="section__title" style={{ fontSize: 28 }}>{t('product.relatedProducts')}</h2>
+diff --git a/src/components/SEO/index.jsx b/src/components/SEO/index.jsx
+index 3eb8256..07e6e85 100644
+--- a/src/components/SEO/index.jsx
++++ b/src/components/SEO/index.jsx
+@@ -6,16 +6,15 @@ export const SITE_URL = 'https://raznobyt.com';
+ 
+ const OG_LOCALE = { ua: 'uk_UA', ru: 'ru_UA' };
+ 
+-// query: суфікс для сторінок пагінації (напр. '?page=2') — canonical і hreflang вказують на ту саму сторінку
+-export default function SEO({ title, description, noindex = false, query = '', brandSuffix = true }) {
++export default function SEO({ title, description, noindex = false, brandSuffix = true }) {
+     const { lang } = useLang();
+     const { pathname } = useLocation();
+     const siteName = 'Різнобит';
+     const fullTitle = title ? (brandSuffix ? `${title} | ${siteName}` : title) : siteName;
+ 
+     const basePath = stripLang(pathname);
+-    const uaUrl = SITE_URL + localizePath(basePath, 'ua') + query;
+-    const ruUrl = SITE_URL + localizePath(basePath, 'ru') + query;
++    const uaUrl = SITE_URL + localizePath(basePath, 'ua');
++    const ruUrl = SITE_URL + localizePath(basePath, 'ru');
+     const canonical = lang === 'ru' ? ruUrl : uaUrl;
+ 
+     return (
+diff --git a/src/index.css b/src/index.css
+index 4871dde..c223c9b 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -2737,7 +2737,7 @@ a.lang-btn {
+   margin-top: 40px;
+ }
+ 
+-/* Пагінація категорій (посилання ?page=N) */
++/* Пагінація категорій (/catalog/<slug>/page/<N>/) */
+ .catalog-pagination {
+   display: flex;
+   flex-wrap: wrap;
+diff --git a/src/lib/pagination.js b/src/lib/pagination.js
+index 7abaa09..a983a19 100644
+--- a/src/lib/pagination.js
++++ b/src/lib/pagination.js
+@@ -1,12 +1,8 @@
+ // Пагінація категорій (SEO-ТЗ T-20261119-01, завдання 4).
+-// Спільна для CategoryView (рендер) і scripts/generate.js (пререндер сторінок ?page=N).
++// Спільна для CategoryView/CategoryPage (рендер) і scripts/generate.js (пререндер /catalog/<slug>/page/<N>/).
+ export const CATEGORY_PAGE_SIZE = 9;
+ 
+ export function getTotalPages(count, pageSize = CATEGORY_PAGE_SIZE) {
+     return Math.max(1, Math.ceil(count / pageSize));
+ }
+ 
+-// '?page=N' лише для N ≥ 2; перша сторінка — без параметра
+-export function pageQuery(page) {
+-    return page > 1 ? `?page=${page}` : '';
+-}
+diff --git a/src/pages/CategoryPage.jsx b/src/pages/CategoryPage.jsx
+index dd4bd9f..dcd0b29 100644
+--- a/src/pages/CategoryPage.jsx
++++ b/src/pages/CategoryPage.jsx
+@@ -1,14 +1,17 @@
+ import { useState, useEffect } from 'react';
+ import { useParams, useLocation, useSearchParams } from 'react-router-dom';
+-import { Navigate } from '../i18n/router';
++import { Navigate, useNavigate } from '../i18n/router';
+ import withRouter from '../lib/withRouter';
+ import { getProductsByCategory } from '../lib/products';
+ import staticProducts from '../data/products.js';
+ import categories from '../data/categories.json';
+ import CategoryView from '../components/Category/CategoryView';
++import NotFound from './NotFound';
++import { CATEGORY_PAGE_SIZE, getTotalPages } from '../lib/pagination';
+ 
+-function CategoryPage({ slug: externalSlug = null }) {
+-  const { slug: paramSlug } = useParams();
++function CategoryPage({ slug: externalSlug = null, page: externalPage = null }) {
++  const { slug: paramSlug, page: pageParam } = useParams();
++  const navigate = useNavigate();
+   const location = useLocation();
+   const [searchParams, setSearchParams] = useSearchParams();
+   const slug = externalSlug ?? paramSlug;
+@@ -24,6 +27,18 @@ function CategoryPage({ slug: externalSlug = null }) {
+ 
+   if (!cat) return <Navigate to="/catalog/" replace />;
+ 
++  // Сторінка пагінації: /catalog/<slug>/page/<N>/ (N ≥ 2). /page/1/ → сторінка категорії; інші — 404
++  let page = 1;
++  if (externalPage) {
++    page = externalPage;
++  } else if (pageParam !== undefined) {
++    if (pageParam === '1') return <Navigate to={expectedPath} replace />;
++    const n = /^[1-9][0-9]*$/.test(pageParam) ? parseInt(pageParam, 10) : NaN;
++    const total = getTotalPages(staticProducts.filter(p => p.category === cat.id).length, CATEGORY_PAGE_SIZE);
++    if (!(n >= 2 && n <= total)) return <NotFound />;
++    page = n;
++  }
++
+   // eslint-disable-next-line react-hooks/rules-of-hooks
+   useEffect(() => {
+     getProductsByCategory(cat.id)
+@@ -55,6 +70,20 @@ function CategoryPage({ slug: externalSlug = null }) {
+   };
+ 
+   const update = (updates) => {
++    // Зміна фільтрів на сторінці N ≥ 2 повертає на першу сторінку категорії
++    if (page > 1) {
++      const next = new URLSearchParams(location.search);
++      next.delete('page');
++      Object.entries(updates).forEach(([key, value]) => {
++        if (key === 'page') return;
++        next.delete(key);
++        if (Array.isArray(value)) value.forEach(v => next.append(key, v));
++        else if (value !== undefined && value !== null && value !== '') next.set(key, String(value));
++      });
++      const qs = next.toString();
++      navigate({ pathname: expectedPath, search: qs ? `?${qs}` : '' }, { replace: true });
++      return;
++    }
+     setSearchParams(prev => {
+       const next = new URLSearchParams(prev);
+       Object.entries(updates).forEach(([key, value]) => {
+@@ -79,8 +108,6 @@ function CategoryPage({ slug: externalSlug = null }) {
+   const selectedDensities = getArray('densities');
+   const selectedWidths = getArray('widths');
+   const selectedCompositions = getArray('compositions');
+-  const parsedPage = parseInt(searchParams.get('page') || '1', 10);
+-  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+ 
+   const setSearch = (val) => update({ q: val, page: undefined });
+   const setSelectedSubcats = (arr) => update({ subcats: arr, page: undefined });
+@@ -89,7 +116,10 @@ function CategoryPage({ slug: externalSlug = null }) {
+   const setSelectedDensities = (arr) => update({ densities: arr, page: undefined });
+   const setSelectedWidths = (arr) => update({ widths: arr, page: undefined });
+   const setSelectedCompositions = (arr) => update({ compositions: arr, page: undefined });
+-  const setPage = (val) => update({ page: typeof val === 'function' ? val(page) : val });
++  const setPage = (val) => {
++    const n = typeof val === 'function' ? val(page) : val;
++    navigate(n > 1 ? `${expectedPath}page/${n}/` : expectedPath);
++  };
+ 
+   const clearAllFilters = () => {
+     update({

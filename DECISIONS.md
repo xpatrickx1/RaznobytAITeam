@@ -7,7 +7,9 @@
 |---|---|
 | 2026-11-16 | Raznobyt окремий бізнес у локальній теці `C:\Users\Dev\webAI\Raznobyt` і окремому Claude Project; GitHub не обов'язковий |
 | 2026-11-16 | Мета: залучати нових клієнтів і нарощувати продажі через інтернет-маркетинг, насамперед Google; B2B-пріоритет, можливо роздріб; бізнес знайомого CEO, сайт створено CEO |
-| 2026-11-16 | Команда (7 ролей): Director, Product Researcher, Sales Manager, Growth Manager, Creative Director, Ads Manager, Store Builder (оптимізація сайту); Supplier Manager не підключено (CEO доручив визначити склад) |
+| 2026-11-16 | Команда (9 ролей): Director, Product Researcher, SEO Specialist, Sales Manager, Growth Manager, Creative Director, Ads Manager, Store Builder (оптимізація сайту), Web Developer; Supplier Manager не підключено (CEO доручив визначити склад) |
+| 2026-11-16 | Створено роль SEO Specialist (шаблон 1.0, платформа 1.1) за прямим дорученням CEO: потрібен SEO-спеціаліст для просування в Google |
+| 2026-11-20 | Додано роль Web Developer (шаблон 1.0, платформа 1.2) за прямим дорученням CEO: локальне виконання перевірок у папці коду сайту без мережі й встановлення; деплой лише CEO. Додано 8 SEO-skills і 5 skills дизайну сайту |
 
 ## Реєстр запитів на погодження
 | ID запиту | Дата | Роль | Дія | Сума / ризик | Рекомендація Director | Рішення CEO | Дата |
